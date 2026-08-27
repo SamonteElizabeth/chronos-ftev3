@@ -1,0 +1,709 @@
+import React, { useState, useMemo } from 'react';
+import { useApp } from '../../context/AppContext';
+import { Task, TaskPriority, TaskStatus } from '../../types';
+import {
+  Search,
+  Filter,
+  Plus,
+  ArrowUpDown,
+  Eye,
+  Edit,
+  Trash2,
+  AlertTriangle,
+  FileSpreadsheet,
+  FileText,
+  Calendar,
+  Layers,
+  ChevronDown,
+  CheckSquare,
+  Square as SquareIcon,
+  Sparkles,
+  RefreshCw,
+} from 'lucide-react';
+import {
+  isTaskOverdue,
+  getDaysOverdue,
+  formatHours,
+} from '../../utils/calculations';
+import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
+import { ConfirmModal } from '../common/ConfirmModal';
+
+interface TaskManagementPageProps {
+  onOpenNewTask: () => void;
+  onViewTask: (task: Task) => void;
+  onEditTask: (task: Task) => void;
+}
+
+type SortField =
+  | 'id'
+  | 'taskName'
+  | 'assignedUserId'
+  | 'startDate'
+  | 'endDate'
+  | 'plannedHours'
+  | 'actualHours'
+  | 'variance'
+  | 'status';
+
+export const TaskManagementPage: React.FC<TaskManagementPageProps> = ({
+  onOpenNewTask,
+  onViewTask,
+  onEditTask,
+}) => {
+  const {
+    tasks,
+    users,
+    departments,
+    categoryConfig,
+    deleteTask,
+    deleteMultipleTasks,
+    keepOnlySampleTasks,
+    currentUser,
+  } = useApp();
+
+  // Search and Filter states
+  const [search, setSearch] = useState('');
+  const [selectedDept, setSelectedDept] = useState('');
+  const [selectedUser, setSelectedUser] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const [onlyOverdue, setOnlyOverdue] = useState(false);
+
+  // Sorting
+  const [sortField, setSortField] = useState<SortField>('endDate');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  // Multi-Selection State
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+
+  // Confirmation Modals State
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+  const [isCleanSampleOpen, setIsCleanSampleOpen] = useState(false);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const filteredTasks = useMemo(() => {
+    return tasks.filter(task => {
+      if (selectedDept && task.departmentId !== selectedDept) return false;
+      if (selectedUser && task.assignedUserId !== selectedUser) return false;
+      if (selectedStatus && task.status !== selectedStatus) return false;
+      if (onlyOverdue && !isTaskOverdue(task)) return false;
+
+      if (search) {
+        const query = search.toLowerCase();
+        const matchesName = task.taskName.toLowerCase().includes(query);
+        const matchesId = task.id.toLowerCase().includes(query);
+        const matchesDesc = task.description.toLowerCase().includes(query);
+        if (!matchesName && !matchesId && !matchesDesc) return false;
+      }
+      return true;
+    });
+  }, [
+    tasks,
+    selectedDept,
+    selectedUser,
+    selectedStatus,
+    onlyOverdue,
+    search,
+  ]);
+
+  const sortedTasks = useMemo(() => {
+    return [...filteredTasks].sort((a, b) => {
+      let valA: any = a[sortField];
+      let valB: any = b[sortField];
+
+      if (typeof valA === 'string') {
+        return sortDirection === 'asc'
+          ? valA.localeCompare(valB)
+          : valB.localeCompare(valA);
+      }
+      if (typeof valA === 'number') {
+        return sortDirection === 'asc' ? valA - valB : valB - valA;
+      }
+      return 0;
+    });
+  }, [filteredTasks, sortField, sortDirection]);
+
+  // Toggle selection
+  const handleToggleSelectAll = () => {
+    if (selectedTaskIds.length === sortedTasks.length && sortedTasks.length > 0) {
+      setSelectedTaskIds([]);
+    } else {
+      setSelectedTaskIds(sortedTasks.map(t => t.id));
+    }
+  };
+
+  const handleToggleSelectTask = (taskId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedTaskIds(prev =>
+      prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]
+    );
+  };
+
+  // Export handlers
+  const handleExportExcel = () => {
+    const exportData = sortedTasks.map(t => {
+      const u = users.find(usr => usr.id === t.assignedUserId);
+      const d = departments.find(dept => dept.id === t.departmentId);
+      return {
+        'Task ID': t.id,
+        'Task Name': t.taskName,
+        'Task Type': t.taskType,
+        'Priority': t.priority,
+        'Assigned Employee': u?.name || t.assignedUserId,
+        'Department': d?.name || t.departmentId,
+        'Start Date': t.startDate,
+        'End Date': t.endDate || 'N/A',
+        'Planned (Hours)': t.plannedHours,
+        'Actual (Hours)': t.actualHours,
+        'Variance (Hours)': t.variance,
+        'Variance (%)': `${t.variancePercent}%`,
+        'Status': t.status,
+        'Overdue': isTaskOverdue(t) ? 'YES' : 'NO',
+        'Remarks': t.remarks,
+      };
+    });
+
+    exportToExcel(
+      {
+        reportName: 'Task Master List & Effort Tracking',
+        generatedDate: new Date().toLocaleString(),
+        generatedBy: `${currentUser.name} (${currentUser.role})`,
+        filtersApplied: {
+          Department: departments.find(d => d.id === selectedDept)?.name || 'All',
+          Employee: users.find(u => u.id === selectedUser)?.name || 'All',
+          Status: selectedStatus || 'All',
+          OverdueOnly: onlyOverdue ? 'Yes' : 'No',
+        },
+        summaryKpis: {
+          'Total Tasks': sortedTasks.length,
+          'Total Planned Hours': `${sortedTasks.reduce((sum, t) => sum + t.plannedHours, 0)}h`,
+          'Total Actual Hours': `${sortedTasks.reduce((sum, t) => sum + t.actualHours, 0).toFixed(1)}h`,
+        },
+      },
+      exportData,
+      'Task_Management_Export'
+    );
+  };
+
+  const handleExportPDF = () => {
+    const columns = [
+      { header: 'ID', dataKey: 'id' },
+      { header: 'Task Name', dataKey: 'taskName' },
+      { header: 'Employee', dataKey: 'employee' },
+      { header: 'Dept', dataKey: 'department' },
+      { header: 'Start', dataKey: 'startDate' },
+      { header: 'End', dataKey: 'endDate' },
+      { header: 'Plan(h)', dataKey: 'plannedHours' },
+      { header: 'Act(h)', dataKey: 'actualHours' },
+      { header: 'Var(h)', dataKey: 'variance' },
+      { header: 'Status', dataKey: 'status' },
+    ];
+
+    const exportData = sortedTasks.map(t => {
+      const u = users.find(usr => usr.id === t.assignedUserId);
+      const d = departments.find(dept => dept.id === t.departmentId);
+      return {
+        id: t.id,
+        taskName: t.taskName,
+        employee: u?.name || t.assignedUserId,
+        department: d?.code || t.departmentId,
+        startDate: t.startDate,
+        endDate: t.endDate || '—',
+        plannedHours: t.plannedHours,
+        actualHours: t.actualHours,
+        variance: t.variance > 0 ? `+${t.variance}` : t.variance,
+        status: t.status,
+      };
+    });
+
+    exportToPDF(
+      {
+        reportName: 'Task Master List & Effort Tracking',
+        generatedDate: new Date().toLocaleString(),
+        generatedBy: `${currentUser.name} (${currentUser.role})`,
+        filtersApplied: {
+          Department: departments.find(d => d.id === selectedDept)?.name || 'All',
+          Status: selectedStatus || 'All',
+        },
+        summaryKpis: {
+          'Total Tasks': sortedTasks.length,
+          'Total Planned': `${sortedTasks.reduce((sum, t) => sum + t.plannedHours, 0)}h`,
+          'Total Actual': `${sortedTasks.reduce((sum, t) => sum + t.actualHours, 0).toFixed(1)}h`,
+        },
+      },
+      columns,
+      exportData,
+      'Task_Management_Export'
+    );
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Delete Single Task Confirmation Modal */}
+      <ConfirmModal
+        isOpen={!!taskToDelete}
+        onClose={() => setTaskToDelete(null)}
+        onConfirm={() => {
+          if (taskToDelete) {
+            deleteTask(taskToDelete.id);
+            setSelectedTaskIds(prev => prev.filter(id => id !== taskToDelete.id));
+            setTaskToDelete(null);
+          }
+        }}
+        title={`Delete Task "${taskToDelete?.taskName || ''}"?`}
+        message={`Are you sure you want to delete task ${taskToDelete?.id}? All recorded time tracking sessions for this task will also be removed.`}
+        confirmLabel="Delete Task"
+        variant="danger"
+      />
+
+      {/* Bulk Delete Tasks Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isBulkDeleteOpen}
+        onClose={() => setIsBulkDeleteOpen(false)}
+        onConfirm={() => {
+          deleteMultipleTasks(selectedTaskIds);
+          setSelectedTaskIds([]);
+          setIsBulkDeleteOpen(false);
+        }}
+        title={`Delete ${selectedTaskIds.length} Selected Tasks?`}
+        message={`Are you sure you want to permanently delete these ${selectedTaskIds.length} selected tasks and their associated time sessions?`}
+        confirmLabel={`Delete (${selectedTaskIds.length})`}
+        variant="danger"
+      />
+
+      {/* Clean Sample Tasks Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isCleanSampleOpen}
+        onClose={() => setIsCleanSampleOpen(false)}
+        onConfirm={() => {
+          keepOnlySampleTasks(3);
+          setSelectedTaskIds([]);
+          setIsCleanSampleOpen(false);
+        }}
+        title="Retain Exactly 3 Sample Tasks?"
+        message="This will delete extra tasks and preserve 3 sample tasks in the system."
+        confirmLabel="Keep 3 Tasks"
+        variant="warning"
+      />
+
+      {/* Top Header & Action Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+            Task Management
+          </h2>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {tasks.length > 3 && (
+            <button
+              onClick={() => setIsCleanSampleOpen(true)}
+              className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold rounded-xl border border-amber-200 shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Delete extra sample tasks and leave 3 sample tasks"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-600" /> Keep 3 Sample Tasks
+            </button>
+          )}
+
+          <button
+            onClick={handleExportExcel}
+            className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-xl border border-slate-200 shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Export Excel
+          </button>
+          <button
+            onClick={handleExportPDF}
+            className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-xl border border-slate-200 shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <FileText className="w-4 h-4 text-rose-600" /> Export PDF
+          </button>
+          <button
+            onClick={onOpenNewTask}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <Plus className="w-4 h-4" /> Create Task
+          </button>
+        </div>
+      </div>
+
+      {/* Floating Selection Toolbar if tasks selected */}
+      {selectedTaskIds.length > 0 && (
+        <div className="bg-slate-900 text-white p-3 rounded-2xl shadow-lg border border-slate-800 flex items-center justify-between gap-4 animate-in slide-in-from-top-2">
+          <div className="flex items-center gap-3 text-xs">
+            <span className="font-semibold px-2.5 py-1 bg-blue-600 rounded-lg text-white font-mono">
+              {selectedTaskIds.length}
+            </span>
+            <span className="text-slate-300 font-medium">task(s) selected</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSelectedTaskIds([])}
+              className="px-3 py-1.5 text-xs text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+            >
+              Clear Selection
+            </button>
+            <button
+              onClick={() => setIsBulkDeleteOpen(true)}
+              className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Delete Selected ({selectedTaskIds.length})
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Filter and Search Bar */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+          {/* Search */}
+          <div className="relative">
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search tasks..."
+              className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
+            />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-3" />
+          </div>
+
+          {/* Department */}
+          <select
+            value={selectedDept}
+            onChange={e => {
+              setSelectedDept(e.target.value);
+              setSelectedUser('');
+            }}
+            className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
+          >
+            <option value="">All Departments</option>
+            {departments.map(d => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Employee */}
+          <select
+            value={selectedUser}
+            onChange={e => setSelectedUser(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
+          >
+            <option value="">All Employees</option>
+            {users
+              .filter(u => (!selectedDept || u.departmentId === selectedDept) && u.status === 'Active')
+              .map(u => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+          </select>
+
+          {/* Status */}
+          <select
+            value={selectedStatus}
+            onChange={e => setSelectedStatus(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
+          >
+            <option value="">All Statuses</option>
+            <option value="Not Started">Not Started</option>
+            <option value="In Progress">In Progress</option>
+            <option value="On Hold">On Hold</option>
+            <option value="Completed">Completed</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
+        </div>
+
+        {/* Quick Filter Pill for Overdue */}
+        <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setOnlyOverdue(prev => !prev)}
+              className={`px-2.5 py-1 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                onlyOverdue
+                  ? 'bg-rose-600 text-white border-rose-600'
+                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              <AlertTriangle className="w-3.5 h-3.5" />
+              Only Overdue Tasks
+            </button>
+            <span className="text-slate-400">|</span>
+            <span className="text-slate-500 font-medium">
+              Showing <strong>{sortedTasks.length}</strong> of {tasks.length} tasks
+            </span>
+          </div>
+
+          <button
+            onClick={() => {
+              setSearch('');
+              setSelectedDept('');
+              setSelectedUser('');
+              setSelectedStatus('');
+              setOnlyOverdue(false);
+            }}
+            className="text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
+          >
+            Clear all filters
+          </button>
+        </div>
+      </div>
+
+      {/* Main Task Data Table */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50/90 border-b border-slate-200 text-slate-600 select-none">
+              <tr>
+                {/* Select All Checkbox */}
+                <th className="py-3 px-3 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    checked={selectedTaskIds.length === sortedTasks.length && sortedTasks.length > 0}
+                    onChange={handleToggleSelectAll}
+                    className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
+                    title="Select All"
+                  />
+                </th>
+                <th
+                  onClick={() => handleSort('id')}
+                  className="py-3 px-3 font-semibold cursor-pointer hover:text-blue-600 whitespace-nowrap"
+                >
+                  <div className="flex items-center gap-1">
+                    Task ID <ArrowUpDown className="w-3 h-3" />
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSort('taskName')}
+                  className="py-3 px-3.5 font-semibold cursor-pointer hover:text-blue-600"
+                >
+                  <div className="flex items-center gap-1">
+                    Task Name <ArrowUpDown className="w-3 h-3" />
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSort('assignedUserId')}
+                  className="py-3 px-3.5 font-semibold cursor-pointer hover:text-blue-600"
+                >
+                  <div className="flex items-center gap-1">
+                    Assignee <ArrowUpDown className="w-3 h-3" />
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSort('startDate')}
+                  className="py-3 px-3.5 font-semibold cursor-pointer hover:text-blue-600 hidden lg:table-cell"
+                >
+                  <div className="flex items-center gap-1">
+                    Start <ArrowUpDown className="w-3 h-3" />
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSort('endDate')}
+                  className="py-3 px-3.5 font-semibold cursor-pointer hover:text-blue-600"
+                >
+                  <div className="flex items-center gap-1">
+                    End Date <ArrowUpDown className="w-3 h-3" />
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSort('plannedHours')}
+                  className="py-3 px-3.5 font-semibold cursor-pointer hover:text-blue-600 text-right"
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    Planned <ArrowUpDown className="w-3 h-3" />
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSort('actualHours')}
+                  className="py-3 px-3.5 font-semibold cursor-pointer hover:text-blue-600 text-right"
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    Actual <ArrowUpDown className="w-3 h-3" />
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSort('variance')}
+                  className="py-3 px-3.5 font-semibold cursor-pointer hover:text-blue-600 text-right"
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    Variance <ArrowUpDown className="w-3 h-3" />
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSort('status')}
+                  className="py-3 px-3.5 font-semibold cursor-pointer hover:text-blue-600"
+                >
+                  <div className="flex items-center gap-1">
+                    Status <ArrowUpDown className="w-3 h-3" />
+                  </div>
+                </th>
+                <th className="py-3 px-3.5 font-semibold text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {sortedTasks.length === 0 ? (
+                <tr>
+                  <td colSpan={11} className="py-12 text-center text-slate-400">
+                    No tasks found matching your filter criteria.
+                  </td>
+                </tr>
+              ) : (
+                sortedTasks.map(task => {
+                  const assignee = users.find(u => u.id === task.assignedUserId);
+                  const dept = departments.find(d => d.id === task.departmentId);
+                  const overdue = isTaskOverdue(task);
+                  const days = getDaysOverdue(task);
+                  const isSelected = selectedTaskIds.includes(task.id);
+
+                  return (
+                    <tr
+                      key={task.id}
+                      onClick={() => onViewTask(task)}
+                      className={`hover:bg-slate-50/80 transition-colors cursor-pointer group ${
+                        isSelected ? 'bg-blue-50/40' : ''
+                      }`}
+                    >
+                      {/* Selection Checkbox */}
+                      <td
+                        className="py-3 px-3 text-center"
+                        onClick={e => handleToggleSelectTask(task.id, e)}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {}}
+                          className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
+                        />
+                      </td>
+
+                      <td className="py-3 px-3 font-mono font-semibold text-slate-600 whitespace-nowrap">
+                        {task.id}
+                      </td>
+                      <td className="py-3 px-3.5 font-semibold text-slate-900 max-w-[260px] truncate">
+                        {task.taskName}
+                      </td>
+                      <td className="py-3 px-3.5 whitespace-nowrap">
+                        <span className="font-medium text-slate-800 block">
+                          {assignee?.name || 'Unassigned'}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          {dept?.code}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3.5 text-slate-500 whitespace-nowrap hidden lg:table-cell">
+                        {task.startDate}
+                      </td>
+                      <td className="py-3 px-3.5 whitespace-nowrap">
+                        {task.endDate ? (
+                          <>
+                            <span
+                              className={`font-medium ${
+                                overdue ? 'text-rose-600 font-bold' : 'text-slate-700'
+                              }`}
+                            >
+                              {task.endDate}
+                            </span>
+                            {overdue && (
+                              <span className="block text-[9px] font-bold text-rose-600 uppercase">
+                                +{days}d Overdue
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">No Due Date</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3.5 text-slate-700 text-right font-mono">
+                        {task.plannedHours}h
+                      </td>
+                      <td className="py-3 px-3.5 font-bold text-slate-900 text-right font-mono">
+                        {task.actualHours}h
+                      </td>
+                      <td className="py-3 px-3.5 text-right whitespace-nowrap font-mono">
+                        <span
+                          className={`font-semibold ${
+                            task.variance > 0
+                              ? 'text-rose-600 font-bold'
+                              : task.variance < 0
+                              ? 'text-emerald-700'
+                              : 'text-slate-600'
+                          }`}
+                        >
+                          {task.variance > 0 ? `+${task.variance}h` : `${task.variance}h`}
+                        </span>
+                        <span className="block text-[10px] text-slate-400">
+                          {task.variancePercent > 0
+                            ? `+${task.variancePercent}%`
+                            : `${task.variancePercent}%`}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3.5 whitespace-nowrap">
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${
+                            task.status === 'Completed'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : task.status === 'In Progress'
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : task.status === 'On Hold'
+                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                              : task.status === 'Cancelled'
+                              ? 'bg-rose-50 text-rose-700 border-rose-200'
+                              : 'bg-slate-100 text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          {task.status}
+                        </span>
+                      </td>
+                      <td
+                        className="py-3 px-3.5 text-right whitespace-nowrap"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-end gap-1.5">
+                          {/* View Action Button */}
+                          <button
+                            onClick={() => onViewTask(task)}
+                            className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 bg-white border border-slate-200 hover:border-blue-300 rounded-lg transition-colors cursor-pointer flex items-center gap-1 font-medium text-xs px-2 shadow-2xs"
+                            title="View Task Details & Timestamps"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-blue-600" />
+                            <span>View</span>
+                          </button>
+
+                          <button
+                            onClick={() => onEditTask(task)}
+                            className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                            title="Edit Task"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            onClick={() => setTaskToDelete(task)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            title="Delete Task"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};

@@ -1,0 +1,730 @@
+import React, { useState, useMemo } from 'react';
+import { useApp } from '../../context/AppContext';
+import { Task } from '../../types';
+import {
+  CheckCircle2,
+  Check,
+  Clock,
+  AlertTriangle,
+  Play,
+  Square,
+  TrendingUp,
+  Activity,
+  Layers,
+  Search,
+  Calendar,
+  Filter,
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
+  SlidersHorizontal,
+} from 'lucide-react';
+import {
+  isTaskOverdue,
+  getDaysOverdue,
+  formatSecondsToTimer,
+  getDateRangeForPeriod,
+} from '../../utils/calculations';
+
+interface EmployeeDashboardProps {
+  onViewTask: (task: Task) => void;
+}
+
+export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({
+  onViewTask,
+}) => {
+  const {
+    currentUser,
+    tasks,
+    timeSessions,
+    activeTimer,
+    timerElapsedSeconds,
+    startTimer,
+    stopTimer,
+  } = useApp();
+
+  // Period & Date filters
+  const [period, setPeriod] = useState<'day' | 'week' | 'month' | 'quarter' | 'year' | 'all' | 'custom'>('month');
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [customStart, setCustomStart] = useState(() => getDateRangeForPeriod('month').startDate);
+  const [customEnd, setCustomEnd] = useState(() => getDateRangeForPeriod('month').endDate);
+
+  // Other filters
+  const [search, setSearch] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const [onlyOverdue, setOnlyOverdue] = useState(false);
+
+  // Filter tasks belonging to current employee
+  const userTasks = useMemo(() => {
+    return tasks.filter(t => t.assignedUserId === currentUser.id);
+  }, [tasks, currentUser]);
+
+  // Filter time sessions belonging to current employee
+  const userSessions = useMemo(() => {
+    return timeSessions.filter(s => s.userId === currentUser.id);
+  }, [timeSessions, currentUser]);
+
+  // Calculate active date range boundaries
+  const dateRange = useMemo(() => {
+    if (period === 'all') return null;
+    if (period === 'custom') {
+      return {
+        startDate: customStart || new Date().toISOString().split('T')[0],
+        endDate: customEnd || new Date().toISOString().split('T')[0],
+      };
+    }
+    if (period === 'day') {
+      return { startDate: selectedDate, endDate: selectedDate };
+    }
+    const ref = selectedDate ? new Date(selectedDate) : new Date();
+    return getDateRangeForPeriod(period, ref);
+  }, [period, selectedDate, customStart, customEnd]);
+
+  // Quick navigation for date (Previous / Next / Today)
+  const handleShiftDate = (days: number) => {
+    const d = new Date(selectedDate);
+    if (period === 'day') {
+      d.setDate(d.getDate() + days);
+    } else if (period === 'week') {
+      d.setDate(d.getDate() + (days * 7));
+    } else if (period === 'month') {
+      d.setMonth(d.getMonth() + (days > 0 ? 1 : -1));
+    } else if (period === 'quarter') {
+      d.setMonth(d.getMonth() + (days > 0 ? 3 : -3));
+    } else if (period === 'year') {
+      d.setFullYear(d.getFullYear() + (days > 0 ? 1 : -1));
+    }
+    setSelectedDate(d.toISOString().split('T')[0]);
+  };
+
+  const handleResetToToday = () => {
+    setSelectedDate(new Date().toISOString().split('T')[0]);
+  };
+
+  // Filter tasks by date range and secondary filters
+  const filteredTasks = useMemo(() => {
+    return userTasks.filter(task => {
+      // Date range filter
+      if (dateRange) {
+        if (task.startDate && task.endDate) {
+          if (task.startDate > dateRange.endDate || task.endDate < dateRange.startDate) {
+            return false;
+          }
+        } else if (task.startDate) {
+          if (task.startDate > dateRange.endDate) {
+            return false;
+          }
+        } else if (task.endDate) {
+          if (task.endDate < dateRange.startDate || task.endDate > dateRange.endDate) {
+            return false;
+          }
+        }
+      }
+
+      // Status filter
+      if (selectedStatus && task.status !== selectedStatus) {
+        return false;
+      }
+
+      // Overdue filter
+      if (onlyOverdue && !isTaskOverdue(task)) {
+        return false;
+      }
+
+      // Search filter
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        const matchesName = task.taskName.toLowerCase().includes(q);
+        const matchesId = task.id.toLowerCase().includes(q);
+        if (!matchesName && !matchesId) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [userTasks, dateRange, selectedStatus, onlyOverdue, search]);
+
+  // Filter time sessions by date range
+  const filteredSessions = useMemo(() => {
+    if (!dateRange) return userSessions;
+    return userSessions.filter(s => {
+      const sDate = s.startTime.split('T')[0];
+      return sDate >= dateRange.startDate && sDate <= dateRange.endDate;
+    });
+  }, [userSessions, dateRange]);
+
+  // KPI Calculations based on filtered tasks
+  const totalTasks = filteredTasks.length;
+  const activeTasks = filteredTasks.filter(t => t.status === 'In Progress').length;
+  const completedTasks = filteredTasks.filter(t => t.status === 'Completed').length;
+  const overdueTasks = filteredTasks.filter(t => isTaskOverdue(t)).length;
+
+  const totalPlannedHours = filteredTasks.reduce((sum, t) => sum + t.plannedHours, 0);
+  const totalActualHours = filteredSessions.length > 0
+    ? filteredSessions.reduce((sum, s) => sum + s.durationHours, 0)
+    : filteredTasks.reduce((sum, t) => sum + t.actualHours, 0);
+
+  // Time tracking chart breakdown according to selected period
+  const chartBreakdown = useMemo(() => {
+    if (period === 'week' || period === 'day') {
+      const weekRange = getDateRangeForPeriod('week', new Date(selectedDate));
+      const start = new Date(weekRange.startDate);
+      const days: { label: string; dateStr: string; hours: number }[] = [];
+      const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        const dateStr = d.toISOString().split('T')[0];
+        const sessionsForDay = userSessions.filter(
+          s => s.startTime.split('T')[0] === dateStr
+        );
+        const hours = Number(
+          sessionsForDay.reduce((sum, s) => sum + s.durationHours, 0).toFixed(1)
+        );
+        days.push({ label: dayNames[i], dateStr, hours });
+      }
+      return { items: days, total: days.reduce((sum, d) => sum + d.hours, 0) };
+    }
+
+    if (period === 'month') {
+      const monthRange = getDateRangeForPeriod('month', new Date(selectedDate));
+      const start = new Date(monthRange.startDate);
+      const weeks: { label: string; dateStr: string; hours: number }[] = [];
+      for (let w = 1; w <= 4; w++) {
+        const wStart = new Date(start);
+        wStart.setDate(start.getDate() + (w - 1) * 7);
+        const wEnd = new Date(start);
+        wEnd.setDate(Math.min(start.getDate() + w * 7 - 1, new Date(monthRange.endDate).getDate()));
+        
+        const wStartStr = wStart.toISOString().split('T')[0];
+        const wEndStr = wEnd.toISOString().split('T')[0];
+
+        const hours = Number(
+          userSessions
+            .filter(s => {
+              const d = s.startTime.split('T')[0];
+              return d >= wStartStr && d <= wEndStr;
+            })
+            .reduce((sum, s) => sum + s.durationHours, 0)
+            .toFixed(1)
+        );
+        weeks.push({ label: `Wk ${w}`, dateStr: `${wStartStr}`, hours });
+      }
+      return { items: weeks, total: weeks.reduce((sum, w) => sum + w.hours, 0) };
+    }
+
+    // Default fallback (e.g. Recent 7 Days)
+    const today = new Date();
+    const days: { label: string; dateStr: string; hours: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const hours = Number(
+        userSessions
+          .filter(s => s.startTime.split('T')[0] === dateStr)
+          .reduce((sum, s) => sum + s.durationHours, 0)
+          .toFixed(1)
+      );
+      days.push({ label: d.toLocaleDateString('en-US', { weekday: 'narrow' }), dateStr, hours });
+    }
+    return { items: days, total: days.reduce((sum, d) => sum + d.hours, 0) };
+  }, [period, selectedDate, userSessions]);
+
+  const maxChartHour = Math.max(8, ...chartBreakdown.items.map(d => d.hours));
+
+  // Status Distribution counts
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      'In Progress': 0,
+      'Completed': 0,
+      'Not Started': 0,
+      'On Hold': 0,
+      'Cancelled': 0,
+    };
+    filteredTasks.forEach(t => {
+      if (counts[t.status] !== undefined) {
+        counts[t.status]++;
+      }
+    });
+    return counts;
+  }, [filteredTasks]);
+
+  // Reset all filters
+  const handleResetFilters = () => {
+    setPeriod('month');
+    setSelectedDate(new Date().toISOString().split('T')[0]);
+    setCustomStart(getDateRangeForPeriod('month').startDate);
+    setCustomEnd(getDateRangeForPeriod('month').endDate);
+    setSearch('');
+    setSelectedStatus('');
+    setOnlyOverdue(false);
+  };
+
+  const hasActiveFilters =
+    period !== 'month' ||
+    search !== '' ||
+    selectedStatus !== '' ||
+    onlyOverdue ||
+    selectedDate !== new Date().toISOString().split('T')[0];
+
+  return (
+    <div className="space-y-6">
+      {/* Welcome Banner */}
+      <div className="bg-white p-5 rounded-2xl text-slate-900 shadow-xs border border-slate-200/80">
+        <h2 className="text-xl font-bold text-slate-900">
+          Welcome back, {currentUser.name}
+        </h2>
+      </div>
+
+      {/* Filter and Date Period Controls Bar */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-2 border-b border-slate-100">
+          {/* Period Toggle Tabs */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl overflow-x-auto text-xs">
+            {[
+              { id: 'day', label: 'Day' },
+              { id: 'week', label: 'Weekly' },
+              { id: 'month', label: 'Monthly' },
+              { id: 'quarter', label: 'Quarterly' },
+              { id: 'year', label: 'Yearly' },
+              { id: 'all', label: 'All Time' },
+              { id: 'custom', label: 'Custom' },
+            ].map(p => (
+              <button
+                key={p.id}
+                onClick={() => setPeriod(p.id as typeof period)}
+                className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition-all cursor-pointer ${
+                  period === p.id
+                    ? 'bg-white text-blue-600 shadow-xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Date Range Summary & Period Stepper */}
+          <div className="flex items-center gap-2 text-xs">
+            {period !== 'all' && period !== 'custom' && (
+              <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-0.5">
+                <button
+                  onClick={() => handleShiftDate(-1)}
+                  className="p-1 text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 rounded cursor-pointer"
+                  title="Previous"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleResetToToday}
+                  className="px-2 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-200/60 rounded cursor-pointer"
+                >
+                  Today
+                </button>
+                <button
+                  onClick={() => handleShiftDate(1)}
+                  className="p-1 text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 rounded cursor-pointer"
+                  title="Next"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {dateRange && (
+              <div className="text-slate-500 font-medium text-[11px] bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200">
+                <Calendar className="w-3.5 h-3.5 inline mr-1.5 text-blue-600 -mt-0.5" />
+                <span>{dateRange.startDate}</span> to <span>{dateRange.endDate}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Interactive Secondary Filter Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs pt-1">
+          {/* Dynamic Context Date Input */}
+          {period === 'day' && (
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Select Day</label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={e => setSelectedDate(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
+              />
+            </div>
+          )}
+
+          {period === 'week' && (
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Week of Date</label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={e => setSelectedDate(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
+              />
+            </div>
+          )}
+
+          {period === 'month' && (
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Select Month Date</label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={e => setSelectedDate(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
+              />
+            </div>
+          )}
+
+          {period === 'custom' && (
+            <div className="sm:col-span-2 grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">From Date</label>
+                <input
+                  type="date"
+                  value={customStart}
+                  onChange={e => setCustomStart(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">To Date</label>
+                <input
+                  type="date"
+                  value={customEnd}
+                  onChange={e => setCustomEnd(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
+                />
+              </div>
+            </div>
+          )}
+
+          {(period === 'quarter' || period === 'year' || period === 'all') && (
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Reference Date</label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={e => setSelectedDate(e.target.value)}
+                disabled={period === 'all'}
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 bg-white text-slate-800 disabled:opacity-50"
+              />
+            </div>
+          )}
+
+          {/* Search Input */}
+          <div className="relative">
+            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Search Tasks</label>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search by name or ID..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
+              />
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+            </div>
+          </div>
+
+          {/* Status Filter */}
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Task Status</label>
+            <select
+              value={selectedStatus}
+              onChange={e => setSelectedStatus(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
+            >
+              <option value="">All Statuses</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Not Started">Not Started</option>
+              <option value="On Hold">On Hold</option>
+              <option value="Completed">Completed</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+          </div>
+
+          {/* Overdue Quick Pill & Reset */}
+          <div className="flex items-end gap-2">
+            <button
+              type="button"
+              onClick={() => setOnlyOverdue(!onlyOverdue)}
+              className={`flex-1 py-2 px-3 rounded-xl border font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer text-xs ${
+                onlyOverdue
+                  ? 'bg-rose-50 border-rose-300 text-rose-700 shadow-xs'
+                  : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <AlertTriangle className={`w-3.5 h-3.5 ${onlyOverdue ? 'text-rose-600' : 'text-slate-400'}`} />
+              Overdue Only
+            </button>
+
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="p-2 rounded-xl border border-slate-300 text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Reset all filters"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Visual Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Chart 1: Task Status Distribution */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-slate-900">Task Status Distribution</h3>
+              <span className="text-xs text-slate-500 font-medium">{totalTasks} tasks</span>
+            </div>
+
+            <div className="space-y-2.5 text-xs">
+              {Object.entries(statusCounts).map(([statusName, count]) => {
+                const numericCount = Number(count);
+                const pct = totalTasks > 0 ? Math.round((numericCount / totalTasks) * 100) : 0;
+                const getBarColor = () => {
+                  switch (statusName) {
+                    case 'In Progress': return 'bg-blue-600';
+                    case 'Completed': return 'bg-emerald-500';
+                    case 'Not Started': return 'bg-slate-400';
+                    case 'On Hold': return 'bg-amber-500';
+                    case 'Cancelled': return 'bg-rose-500';
+                    default: return 'bg-indigo-500';
+                  }
+                };
+                return (
+                  <div key={statusName} className="space-y-1">
+                    <div className="flex justify-between text-slate-700">
+                      <span className="font-medium">{statusName}</span>
+                      <span className="font-semibold text-slate-900">{count} ({pct}%)</span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full transition-all duration-500 ${getBarColor()}`} style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Chart 2: Planned vs Actual Hours */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-slate-900">Planned vs Actual Hours</h3>
+              <span className="text-xs text-slate-500 font-medium">Workload Progress</span>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span className="font-medium text-slate-600">Actual Hours Logged</span>
+                  <span className="font-bold text-blue-600">{totalActualHours.toFixed(1)}h</span>
+                </div>
+                <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(100, totalPlannedHours > 0 ? (totalActualHours / totalPlannedHours) * 100 : 0)}%` }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span className="font-medium text-slate-600">Planned Hours Budget</span>
+                  <span className="font-bold text-slate-800">{totalPlannedHours}h</span>
+                </div>
+                <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-slate-400 rounded-full" style={{ width: '100%' }} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200/60 text-xs text-slate-600 flex items-center justify-between">
+            <span>Overall Completion Rate:</span>
+            <span className="font-bold text-blue-600">
+              {totalPlannedHours > 0 ? Math.round((totalActualHours / totalPlannedHours) * 100) : 0}%
+            </span>
+          </div>
+        </div>
+
+        {/* Chart 3: Time Tracking Breakdown */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-bold text-slate-900">Tracked Time Activity</h3>
+              <span className="text-xs text-blue-600 font-semibold uppercase">{period} view</span>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">Hours logged across period segments.</p>
+
+            {/* Segment Bar Columns */}
+            <div className="flex items-end justify-between gap-2 h-32 pt-4 px-1">
+              {chartBreakdown.items.map(segment => {
+                const heightPct = Math.min(100, Math.round((segment.hours / maxChartHour) * 100));
+                const isTarget = segment.hours >= 7.5;
+                return (
+                  <div key={segment.dateStr || segment.label} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+                    <span className="text-[10px] font-bold text-slate-700">{segment.hours > 0 ? `${segment.hours}h` : '0'}</span>
+                    <div className="w-full max-w-[28px] bg-slate-100 rounded-t-lg overflow-hidden flex flex-col justify-end h-20">
+                      <div
+                        className={`w-full rounded-t-lg transition-all duration-500 ${
+                          segment.hours === 0
+                            ? 'bg-slate-200'
+                            : isTarget
+                            ? 'bg-blue-600'
+                            : 'bg-blue-400'
+                        }`}
+                        style={{ height: `${heightPct}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] font-medium text-slate-500 truncate max-w-[36px]">{segment.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="text-[11px] text-slate-500 text-center mt-3 pt-2 border-t border-slate-100">
+            Total for period:{' '}
+            <strong className="text-slate-800">
+              {chartBreakdown.total.toFixed(1)}h
+            </strong>
+          </div>
+        </div>
+      </div>
+
+      {/* My Active Tasks Quick Table */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">My Tasks</h3>
+            <p className="text-xs text-slate-500">
+              Showing {filteredTasks.length} task{filteredTasks.length === 1 ? '' : 's'} matching current filters
+            </p>
+          </div>
+          {hasActiveFilters && (
+            <button
+              onClick={handleResetFilters}
+              className="text-xs text-blue-600 hover:text-blue-800 font-semibold cursor-pointer"
+            >
+              Reset Filters
+            </button>
+          )}
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
+              <tr>
+                <th className="py-3 px-4 font-semibold">Task ID</th>
+                <th className="py-3 px-4 font-semibold">Task Name</th>
+                <th className="py-3 px-4 font-semibold">Status</th>
+                <th className="py-3 px-4 font-semibold">Start Date</th>
+                <th className="py-3 px-4 font-semibold">End Date</th>
+                <th className="py-3 px-4 font-semibold">Planned</th>
+                <th className="py-3 px-4 font-semibold">Actual</th>
+                <th className="py-3 px-4 font-semibold">Variance</th>
+                <th className="py-3 px-4 font-semibold text-right">Timer Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredTasks.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="text-center py-8 text-slate-400">
+                    No tasks found matching your filter criteria.
+                  </td>
+                </tr>
+              ) : (
+                filteredTasks.slice(0, 10).map(task => {
+                  const isOverdue = isTaskOverdue(task);
+                  const isRunning = activeTimer?.taskId === task.id;
+
+                  return (
+                    <tr
+                      key={task.id}
+                      onClick={() => onViewTask(task)}
+                      className="hover:bg-slate-50/80 transition-colors cursor-pointer"
+                    >
+                      <td className="py-3 px-4 font-mono font-semibold text-slate-600">
+                        {task.id}
+                      </td>
+                      <td className="py-3 px-4 font-semibold text-slate-900 max-w-[240px] truncate">
+                        {task.taskName}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                            task.status === 'Completed'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : task.status === 'In Progress'
+                              ? 'bg-blue-100 text-blue-800'
+                              : task.status === 'On Hold'
+                              ? 'bg-amber-100 text-amber-800'
+                              : task.status === 'Cancelled'
+                              ? 'bg-rose-100 text-rose-800'
+                              : 'bg-slate-100 text-slate-700'
+                          }`}
+                        >
+                          {task.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-600">
+                        {task.startDate}
+                      </td>
+                      <td className={`py-3 px-4 font-medium ${isOverdue ? 'text-rose-600 font-bold' : 'text-slate-600'}`}>
+                        {task.endDate || <span className="text-slate-400 italic">No Due Date</span>}
+                      </td>
+                      <td className="py-3 px-4 text-slate-700 font-medium">{task.plannedHours}h</td>
+                      <td className="py-3 px-4 font-bold text-slate-900">{task.actualHours}h</td>
+                      <td className="py-3 px-4 font-medium">
+                        <span className={task.variance > 0 ? 'text-rose-600 font-bold' : 'text-emerald-700'}>
+                          {task.variance > 0 ? `+${task.variance}h` : `${task.variance}h`}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right" onClick={e => e.stopPropagation()}>
+                        {task.status === 'Completed' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg font-semibold text-xs ml-auto shadow-2xs">
+                            <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" /> Finished
+                          </span>
+                        ) : isRunning ? (
+                          <button
+                            onClick={() => stopTimer()}
+                            className="px-3 py-1 bg-rose-500 hover:bg-rose-600 text-white rounded-lg font-medium text-xs flex items-center gap-1.5 ml-auto shadow-xs cursor-pointer"
+                          >
+                            <Square className="w-3.5 h-3.5 fill-white" /> Stop
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => startTimer(task)}
+                            disabled={task.status === 'Cancelled'}
+                            className="px-3 py-1 bg-blue-50 hover:bg-blue-500 text-blue-600 hover:text-white border border-blue-200 hover:border-blue-500 rounded-lg font-medium text-xs flex items-center gap-1.5 ml-auto transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                          >
+                            <Play className="w-3.5 h-3.5 fill-current" /> Start
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
