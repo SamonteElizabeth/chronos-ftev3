@@ -37,7 +37,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [taskType, setTaskType] = useState('Analysis');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [plannedHours, setPlannedHours] = useState<number>(8);
+  const [shiftHours, setShiftHours] = useState<number>(8);
   const [remarks, setRemarks] = useState('');
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -51,7 +51,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setTaskType(activeTaskToEdit.taskType || 'Analysis');
       setStartDate(activeTaskToEdit.startDate);
       setEndDate(activeTaskToEdit.endDate || '');
-      setPlannedHours(activeTaskToEdit.plannedHours || 8);
+      setShiftHours(activeTaskToEdit.shiftHours || activeTaskToEdit.plannedHours || 8);
       setRemarks(activeTaskToEdit.remarks || '');
       setErrors({});
     } else {
@@ -63,7 +63,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setTaskType(categoryConfig.taskTypes[0] || 'Analysis');
       setStartDate(today);
       setEndDate('');
-      setPlannedHours(8);
+      setShiftHours(8);
       setRemarks('');
       setErrors({});
     }
@@ -106,7 +106,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           taskType,
           startDate,
           endDate: cleanEndDate,
-          plannedHours: Number(plannedHours || 8),
+          shiftHours: Number(shiftHours || 8),
+          plannedHours: Number(shiftHours || 8),
           remarks: trimmedRemarks,
         }
       );
@@ -124,7 +125,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
         departmentId: departmentId || currentUser.departmentId || 'DEP-001',
         startDate,
         endDate: cleanEndDate,
-        plannedHours: Number(plannedHours || 8),
+        shiftHours: Number(shiftHours || 8),
+        plannedHours: Number(shiftHours || 8),
         createdBy: currentUser.id,
       });
       if (created) onClose();

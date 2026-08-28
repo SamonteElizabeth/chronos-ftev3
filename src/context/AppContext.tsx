@@ -356,7 +356,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return prevTasks.map(t => {
         if (t.id !== taskId) return t;
         const actualHours = calculateTaskActualHours(taskId, sessions);
-        const { variance, variancePercent } = calculateVariance(t.plannedHours, actualHours);
+        const taskShiftHours = t.shiftHours || t.plannedHours || 8;
+        const { variance, variancePercent } = calculateVariance(taskShiftHours, actualHours);
         return {
           ...t,
           actualHours,
@@ -516,9 +517,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast('error', 'Validation Error', 'End Date cannot be earlier than Start Date.');
       return null;
     }
-    // 5. Planned Effort > 0
-    if (!taskData.plannedHours || taskData.plannedHours <= 0) {
-      showToast('error', 'Validation Error', 'Planned Effort must be greater than zero hours.');
+    // 5. Shift Effort > 0
+    const effShiftHours = taskData.shiftHours || taskData.plannedHours || 8;
+    if (effShiftHours <= 0) {
+      showToast('error', 'Validation Error', 'Shift Hours must be greater than zero hours.');
       return null;
     }
 
@@ -531,8 +533,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newTask: Task = {
       ...taskData,
       id: newId,
+      shiftHours: effShiftHours,
+      plannedHours: effShiftHours,
       actualHours: 0,
-      variance: -taskData.plannedHours,
+      variance: -effShiftHours,
       variancePercent: -100,
       createdAt: now,
       updatedAt: now,
@@ -546,7 +550,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       newTask.id,
       newTask.taskName,
       'None',
-      `Assigned to ${users.find(u => u.id === newTask.assignedUserId)?.name || newTask.assignedUserId}, Planned: ${newTask.plannedHours}h`
+      `Assigned to ${users.find(u => u.id === newTask.assignedUserId)?.name || newTask.assignedUserId}, Shift Hour: ${newTask.shiftHours}h`
     );
 
     showToast('success', 'Task Created', `Task "${newTask.taskName}" (${newTask.id}) created and saved successfully.`);
@@ -569,8 +573,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return false;
     }
 
-    if (updates.plannedHours !== undefined && updates.plannedHours <= 0) {
-      showToast('error', 'Validation Error', 'Planned Effort must be greater than zero.');
+    const inputShiftHours = updates.shiftHours !== undefined ? updates.shiftHours : updates.plannedHours;
+    if (inputShiftHours !== undefined && inputShiftHours <= 0) {
+      showToast('error', 'Validation Error', 'Shift Hours must be greater than zero.');
       return false;
     }
 
@@ -580,9 +585,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const now = new Date().toISOString();
-    const planned = updates.plannedHours !== undefined ? updates.plannedHours : existing.plannedHours;
+    const shiftHoursVal = inputShiftHours !== undefined ? inputShiftHours : (existing.shiftHours || existing.plannedHours || 8);
     const actual = existing.actualHours;
-    const { variance, variancePercent } = calculateVariance(planned, actual);
+    const { variance, variancePercent } = calculateVariance(shiftHoursVal, actual);
 
     let completedAt = existing.completedAt;
     if (updates.status === 'Completed' && existing.status !== 'Completed') {
@@ -594,7 +599,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updatedTask: Task = {
       ...existing,
       ...updates,
-      plannedHours: planned,
+      shiftHours: shiftHoursVal,
+      plannedHours: shiftHoursVal,
       variance,
       variancePercent,
       completedAt,
@@ -608,8 +614,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       'Tasks',
       taskId,
       updatedTask.taskName,
-      `Status: ${existing.status}, Planned: ${existing.plannedHours}h`,
-      `Status: ${updatedTask.status}, Planned: ${updatedTask.plannedHours}h`,
+      `Status: ${existing.status}, Shift Hour: ${existing.shiftHours || existing.plannedHours}h`,
+      `Status: ${updatedTask.status}, Shift Hour: ${updatedTask.shiftHours}h`,
       reason
     );
 

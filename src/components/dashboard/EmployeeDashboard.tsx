@@ -160,7 +160,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({
   const completedTasks = filteredTasks.filter(t => t.status === 'Completed').length;
   const overdueTasks = filteredTasks.filter(t => isTaskOverdue(t)).length;
 
-  const totalPlannedHours = filteredTasks.reduce((sum, t) => sum + t.plannedHours, 0);
+  const totalPlannedHours = filteredTasks.reduce((sum, t) => sum + (t.shiftHours || t.plannedHours || 0), 0);
   const totalActualHours = filteredSessions.length > 0
     ? filteredSessions.reduce((sum, s) => sum + s.durationHours, 0)
     : filteredTasks.reduce((sum, t) => sum + t.actualHours, 0);
@@ -523,7 +523,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold text-slate-900">Planned vs Actual Hours</h3>
+              <h3 className="text-sm font-bold text-slate-900">Shift Hours vs Actual Hours</h3>
               <span className="text-xs text-slate-500 font-medium">Workload Progress</span>
             </div>
 
@@ -543,7 +543,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({
 
               <div>
                 <div className="flex justify-between mb-1">
-                  <span className="font-medium text-slate-600">Planned Hours Budget</span>
+                  <span className="font-medium text-slate-600">Shift Hours</span>
                   <span className="font-bold text-slate-800">{totalPlannedHours}h</span>
                 </div>
                 <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
@@ -634,7 +634,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({
                 <th className="py-3 px-4 font-semibold">Status</th>
                 <th className="py-3 px-4 font-semibold">Start Date</th>
                 <th className="py-3 px-4 font-semibold">End Date</th>
-                <th className="py-3 px-4 font-semibold">Planned</th>
+                <th className="py-3 px-4 font-semibold">Shift Hour</th>
                 <th className="py-3 px-4 font-semibold">Actual</th>
                 <th className="py-3 px-4 font-semibold">Variance</th>
                 <th className="py-3 px-4 font-semibold text-right">Timer Action</th>
@@ -687,7 +687,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({
                       <td className={`py-3 px-4 font-medium ${isOverdue ? 'text-rose-600 font-bold' : 'text-slate-600'}`}>
                         {task.endDate || <span className="text-slate-400 italic">No Due Date</span>}
                       </td>
-                      <td className="py-3 px-4 text-slate-700 font-medium">{task.plannedHours}h</td>
+                      <td className="py-3 px-4 text-slate-700 font-medium">{task.shiftHours || task.plannedHours || 0}h</td>
                       <td className="py-3 px-4 font-bold text-slate-900">{task.actualHours}h</td>
                       <td className="py-3 px-4 font-medium">
                         <span className={task.variance > 0 ? 'text-rose-600 font-bold' : 'text-emerald-700'}>

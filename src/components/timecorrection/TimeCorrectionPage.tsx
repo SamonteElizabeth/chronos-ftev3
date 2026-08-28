@@ -116,9 +116,23 @@ export const TimeCorrectionPage: React.FC<TimeCorrectionPageProps> = ({
     return { startDateStr: '1970-01-01', endDateStr: '2099-12-31' };
   }, [period, customStartDate, customEndDate]);
 
+  // Accessible sessions based on role
+  const accessibleSessions = useMemo(() => {
+    if (currentUser.role === 'TASK_USER') {
+      return timeSessions.filter(s => s.userId === currentUser.id);
+    }
+    if (currentUser.role === 'DEPT_MANAGER') {
+      return timeSessions.filter(s => {
+        const user = users.find(u => u.id === s.userId);
+        return user?.departmentId === currentUser.departmentId;
+      });
+    }
+    return timeSessions;
+  }, [timeSessions, currentUser, users]);
+
   // Filtered Sessions
   const filteredSessions = useMemo(() => {
-    return timeSessions.filter(session => {
+    return accessibleSessions.filter(session => {
       // Scope: Corrections only vs All sessions
       if (viewScope === 'corrections_only') {
         if (!session.isManual && !session.correctionType && !session.manualReason) {
@@ -126,9 +140,11 @@ export const TimeCorrectionPage: React.FC<TimeCorrectionPageProps> = ({
         }
       }
 
-      // User filter
-      if (filterUser !== 'all' && session.userId !== filterUser) {
-        return false;
+      // User filter (only applies if manager/admin)
+      if (currentUser.role !== 'TASK_USER') {
+        if (filterUser !== 'all' && session.userId !== filterUser) {
+          return false;
+        }
       }
 
       // Period filter
@@ -174,7 +190,7 @@ export const TimeCorrectionPage: React.FC<TimeCorrectionPageProps> = ({
       return true;
     });
   }, [
-    timeSessions,
+    accessibleSessions,
     viewScope,
     filterUser,
     period,
@@ -185,11 +201,12 @@ export const TimeCorrectionPage: React.FC<TimeCorrectionPageProps> = ({
     search,
     tasks,
     users,
+    currentUser,
   ]);
 
   // Statistics
   const stats = useMemo(() => {
-    const totalCorrectedSessions = timeSessions.filter(s => s.isManual || s.correctionType || s.manualReason);
+    const totalCorrectedSessions = accessibleSessions.filter(s => s.isManual || s.correctionType || s.manualReason);
     const totalCorrectedHours = totalCorrectedSessions.reduce((sum, s) => sum + s.durationHours, 0);
 
     // Current filtered metrics
@@ -222,7 +239,7 @@ export const TimeCorrectionPage: React.FC<TimeCorrectionPageProps> = ({
       topScenario,
       fteEquivalent,
     };
-  }, [timeSessions, filteredSessions]);
+  }, [accessibleSessions, filteredSessions]);
 
   // Export handlers
   const handleExportExcel = () => {
@@ -368,7 +385,7 @@ export const TimeCorrectionPage: React.FC<TimeCorrectionPageProps> = ({
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Total Corrected Hours */}
         <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 mb-2">
@@ -384,7 +401,7 @@ export const TimeCorrectionPage: React.FC<TimeCorrectionPageProps> = ({
             </span>
           </div>
           <p className="text-[11px] text-slate-400 mt-1.5">
-            Included in task actuals and project hours
+            Included in task actuals and tracked hours
           </p>
         </div>
 
@@ -422,25 +439,6 @@ export const TimeCorrectionPage: React.FC<TimeCorrectionPageProps> = ({
           </div>
           <p className="text-[11px] text-slate-400 mt-1.5">
             Most frequent manual adjustment reason
-          </p>
-        </div>
-
-        {/* FTE Utilization Impact */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold">FTE Utilization Impact</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900">+{stats.fteEquivalent} FTE</span>
-            <span className="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-              Calculated
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1.5">
-            Active in capacity & utilization analytics
           </p>
         </div>
       </div>
@@ -625,7 +623,7 @@ export const TimeCorrectionPage: React.FC<TimeCorrectionPageProps> = ({
                   <th className="px-5 py-3">Classification & ID</th>
                   <th className="px-5 py-3">Entry Type</th>
                   <th className="px-5 py-3">Employee</th>
-                  <th className="px-5 py-3">Task & Project</th>
+                  <th className="px-5 py-3">Task Details</th>
                   <th className="px-5 py-3">Date & Time</th>
                   <th className="px-5 py-3 text-right">Logged Hours</th>
                   <th className="px-5 py-3">Correction Reason & Notes</th>
@@ -710,7 +708,7 @@ export const TimeCorrectionPage: React.FC<TimeCorrectionPageProps> = ({
                         </div>
                       </td>
 
-                      {/* Task & Project */}
+                      {/* Task Details */}
                       <td className="px-5 py-3.5 align-top max-w-[200px]">
                         <div>
                           {task ? (

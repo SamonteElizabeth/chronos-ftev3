@@ -205,20 +205,20 @@ export const ViewTaskModal: React.FC<ViewTaskModalProps> = ({
 
         {/* Content Body */}
         <div className="p-6 overflow-y-auto space-y-6 flex-1 text-sm text-slate-700">
-          {/* Planned vs Actual Summary */}
+          {/* Shift Hours vs Actual Summary */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-500 font-medium">Planned Hours</span>
+                <span className="text-xs text-slate-500 font-medium">Shift Hours</span>
                 <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                  Auto-Calculated
+                  Scheduled Shift
                 </span>
               </div>
               <div className="text-xl font-bold text-slate-800 mt-1 font-mono">
-                {task.plannedHours}h
+                {task.shiftHours || task.plannedHours || 0}h
               </div>
               <div className="text-[11px] text-slate-500 mt-1 leading-tight">
-                ({scheduleCalc.workingDaysCount} working {scheduleCalc.workingDaysCount === 1 ? 'day' : 'days'} × {assignedSchedule.hoursPerDay}h/day • {assignedSchedule.name})
+                ({scheduleCalc.workingDaysCount} working {scheduleCalc.workingDaysCount === 1 ? 'day' : 'days'} × {assignedSchedule.hoursPerDay}h/day shift • {assignedSchedule.name})
               </div>
             </div>
 
@@ -237,14 +237,14 @@ export const ViewTaskModal: React.FC<ViewTaskModalProps> = ({
                   : 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
               }`}
             >
-              <span className="text-xs font-medium opacity-80">Variance (Act - Plan)</span>
+              <span className="text-xs font-medium opacity-80">Variance (Actual - Shift Hour)</span>
               <div className="text-xl font-bold mt-1 font-mono">
                 {task.variance > 0 ? `+${task.variance}h` : `${task.variance}h`}
               </div>
               <span className="text-xs opacity-75">
                 {task.variancePercent > 0
-                  ? `+${task.variancePercent}% overrun`
-                  : `${task.variancePercent}% under budget`}
+                  ? `+${task.variancePercent}% over shift`
+                  : `${task.variancePercent}% under shift`}
               </span>
             </div>
           </div>

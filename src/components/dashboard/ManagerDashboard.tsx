@@ -266,7 +266,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
   const overdueTasksCount = overdueTasksList.length;
 
   const totalPlannedHours = useMemo(() => {
-    return filteredTasks.reduce((sum, t) => sum + t.plannedHours, 0);
+    return filteredTasks.reduce((sum, t) => sum + (t.shiftHours || t.plannedHours || 0), 0);
   }, [filteredTasks]);
 
   const totalActualHours = useMemo(() => {
@@ -332,7 +332,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
       const deptTasks = tasks.filter(t => t.departmentId === dept.id);
       
       const actualHours = deptTasks.reduce((sum, t) => sum + t.actualHours, 0);
-      const plannedHours = deptTasks.reduce((sum, t) => sum + t.plannedHours, 0);
+      const plannedHours = deptTasks.reduce((sum, t) => sum + (t.shiftHours || t.plannedHours || 0), 0);
 
       const availableHours = deptUsers.reduce((sum, u) => {
         const schedule = workingSchedules.find(s => s.id === u.workingScheduleId) || workingSchedules[0];
@@ -383,7 +383,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
     return relevantUsers.map(user => {
       const userTasks = filteredTasks.filter(t => t.assignedUserId === user.id);
       const actualHours = userTasks.reduce((sum, t) => sum + (t.actualHours || 0), 0);
-      const plannedHours = userTasks.reduce((sum, t) => sum + t.plannedHours, 0);
+      const plannedHours = userTasks.reduce((sum, t) => sum + (t.shiftHours || t.plannedHours || 0), 0);
 
       const schedule = workingSchedules.find(s => s.id === user.workingScheduleId) || workingSchedules[0];
       const { availableHours } = calculateAvailableWorkingHours(
@@ -505,13 +505,14 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
   const effortVarianceTop10 = useMemo(() => {
     return [...filteredTasks]
       .map(task => {
-        const variance = Number(((task.actualHours || 0) - task.plannedHours).toFixed(1));
+        const taskShiftHours = task.shiftHours || task.plannedHours || 0;
+        const variance = Number(((task.actualHours || 0) - taskShiftHours).toFixed(1));
         const variancePercent =
-          task.plannedHours > 0 ? Number(((variance / task.plannedHours) * 100).toFixed(1)) : 0;
+          taskShiftHours > 0 ? Number(((variance / taskShiftHours) * 100).toFixed(1)) : 0;
         return {
           id: task.id,
           taskName: task.taskName,
-          plannedHours: task.plannedHours,
+          plannedHours: taskShiftHours,
           actualHours: Number((task.actualHours || 0).toFixed(1)),
           variance,
           variancePercent,
@@ -542,7 +543,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
                 ? 'Admin Executive Dashboard'
                 : isDeptManager
                 ? `${currentDept?.name || 'Department'} Manager Dashboard`
-                : 'Operations & Workforce Dashboard'}
+                : 'Manager Dashboard'}
             </h2>
             <span
               className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${
@@ -553,7 +554,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
                   : 'bg-emerald-100 text-emerald-800'
               }`}
             >
-              {isAdmin ? 'System Admin' : isDeptManager ? 'Dept Manager' : 'Workforce Manager'}
+              {isAdmin ? 'System Admin' : isDeptManager ? 'Dept Manager' : ''}
             </span>
           </div>
         </div>
@@ -1159,7 +1160,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
                             return (
                               <div className="bg-slate-900 text-white p-2.5 rounded-xl shadow-lg text-xs space-y-1">
                                 <p className="font-bold text-white">{data.employee}</p>
-                                <p className="text-slate-300">Planned: <strong>{data.plannedHours}h</strong></p>
+                                <p className="text-slate-300">Shift Hours: <strong>{data.plannedHours}h</strong></p>
                                 <p className="text-slate-300">Available: <strong>{data.availableHours}h</strong></p>
                               </div>
                             );
@@ -1168,7 +1169,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
                         }}
                       />
                       <Bar dataKey="availableHours" name="Available (h)" fill="#CBD5E1" radius={[0, 4, 4, 0]} />
-                      <Bar dataKey="plannedHours" name="Planned (h)" fill="#6366F1" radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="plannedHours" name="Shift Hours (h)" fill="#6366F1" radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -1176,7 +1177,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
 
               <div className="pt-2 border-t border-slate-100 text-xs text-slate-500 flex justify-between">
                 <span>Planning density</span>
-                <span className="font-semibold text-slate-700">{totalPlannedHours}h total planned</span>
+                <span className="font-semibold text-slate-700">{totalPlannedHours}h total shift</span>
               </div>
             </div>
           </div>
@@ -1368,7 +1369,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
                               {item.taskName}
                             </p>
                             <p className="text-[10px] text-slate-500">
-                              Planned: {item.plannedHours}h • Actual: {item.actualHours}h
+                              Shift Hour: {item.plannedHours}h • Actual: {item.actualHours}h
                             </p>
                           </div>
                         </div>

@@ -42,7 +42,7 @@ export type TaskPriority = 'Low' | 'Medium' | 'High' | 'Critical';
 export type TaskType = 'Analysis' | 'Development' | 'Testing' | 'Documentation' | 'Meeting' | 'Support' | 'Review' | 'Planning' | 'Administrative' | 'Training';
 
 export type RequestType =
-  | 'Project Work'
+  | 'Operational Work'
   | 'Change Request'
   | 'Support'
   | 'Business Analysis'
@@ -66,10 +66,11 @@ export interface Task {
   departmentId: string;
   startDate: string; // YYYY-MM-DD
   endDate?: string;  // YYYY-MM-DD (Optional)
-  plannedHours: number;
+  shiftHours: number; // Shift Hour (e.g. 8h/10h scheduled effort)
+  plannedHours?: number; // alias for backward compatibility
   actualHours: number; // calculated sum of time sessions
-  variance: number;    // actualHours - plannedHours
-  variancePercent: number; // ((actual - planned)/planned) * 100
+  variance: number;    // actualHours - shiftHours
+  variancePercent: number; // ((actual - shiftHours)/shiftHours) * 100
   overtimeHours?: number; // approved/logged overtime
   status: TaskStatus;
   remarks: string;
@@ -114,14 +115,25 @@ export interface ActiveTimer {
   lastTick?: string;
 }
 
+export interface BreakScheduleBreakdown {
+  lunchBreakMinutes: number; // 60 mins (12:00 PM to 1:00 PM)
+  lunchTimeRange?: string; // "12:00 PM - 01:00 PM"
+  morningBreakMinutes: number; // 30 mins
+  morningTimeRange?: string; // "10:00 AM - 10:30 AM"
+  afternoonBreakMinutes: number; // 30 mins
+  afternoonTimeRange?: string; // "03:00 PM - 03:30 PM"
+}
+
 export interface WorkingSchedule {
   id: string;
   name: string;
-  hoursPerDay: number;
+  hoursPerDay: number; // Gross shift hours: 10
+  netWorkHoursPerDay?: number; // Net working hours after breaks: 8
   workingDays: number[]; // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
-  startTime: string; // e.g. "09:00"
-  endTime: string;   // e.g. "17:00"
-  breakHours: number; // e.g. 1
+  startTime: string; // e.g. "08:30"
+  endTime: string;   // e.g. "18:30"
+  breakHours: number; // Total break hours: 2 (1h lunch + 30m morning + 30m afternoon)
+  breakBreakdown?: BreakScheduleBreakdown;
   isDefault?: boolean;
 }
 

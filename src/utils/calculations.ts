@@ -46,13 +46,13 @@ export function calculateTaskActualHours(taskId: string, sessions: TimeSession[]
 }
 
 /**
- * Calculates variance and variance percentage
+ * Calculates variance and variance percentage against Shift Hours
  */
-export function calculateVariance(plannedHours: number, actualHours: number) {
-  const variance = Number((actualHours - plannedHours).toFixed(2));
+export function calculateVariance(shiftHours: number, actualHours: number) {
+  const variance = Number((actualHours - shiftHours).toFixed(2));
   let variancePercent = 0;
-  if (plannedHours > 0) {
-    variancePercent = Number((((actualHours - plannedHours) / plannedHours) * 100).toFixed(1));
+  if (shiftHours > 0) {
+    variancePercent = Number((((actualHours - shiftHours) / shiftHours) * 100).toFixed(1));
   }
   return { variance, variancePercent };
 }
@@ -90,11 +90,27 @@ export function calculateAvailableWorkingHours(
   endDateStr?: string,
   schedule?: WorkingSchedule,
   holidays: Holiday[] = []
-): { availableHours: number; workingDaysCount: number; holidayCount: number } {
-  const hoursPerDay = schedule?.hoursPerDay || 8;
+): {
+  availableHours: number;
+  shiftHours: number;
+  breakHours: number;
+  workingDaysCount: number;
+  holidayCount: number;
+} {
+  const shiftHoursPerDay = schedule?.hoursPerDay || 10;
+  const breakHoursPerDay = schedule?.breakHours !== undefined ? schedule.breakHours : 2;
+  const netHoursPerDay =
+    schedule?.netWorkHoursPerDay ||
+    (shiftHoursPerDay - breakHoursPerDay > 0 ? shiftHoursPerDay - breakHoursPerDay : shiftHoursPerDay);
 
   if (!startDateStr) {
-    return { availableHours: hoursPerDay, workingDaysCount: 1, holidayCount: 0 };
+    return {
+      availableHours: netHoursPerDay,
+      shiftHours: shiftHoursPerDay,
+      breakHours: breakHoursPerDay,
+      workingDaysCount: 1,
+      holidayCount: 0,
+    };
   }
 
   // If no endDate provided, calculate for 1 working day on startDate
@@ -104,14 +120,26 @@ export function calculateAvailableWorkingHours(
   const end = new Date(effectiveEnd);
 
   if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-    return { availableHours: hoursPerDay, workingDaysCount: 1, holidayCount: 0 };
+    return {
+      availableHours: netHoursPerDay,
+      shiftHours: shiftHoursPerDay,
+      breakHours: breakHoursPerDay,
+      workingDaysCount: 1,
+      holidayCount: 0,
+    };
   }
 
   start.setHours(0, 0, 0, 0);
   end.setHours(23, 59, 59, 999);
 
   if (start > end) {
-    return { availableHours: 0, workingDaysCount: 0, holidayCount: 0 };
+    return {
+      availableHours: 0,
+      shiftHours: 0,
+      breakHours: 0,
+      workingDaysCount: 0,
+      holidayCount: 0,
+    };
   }
 
   // Create holiday lookup set (YYYY-MM-DD)
@@ -139,9 +167,17 @@ export function calculateAvailableWorkingHours(
     current.setDate(current.getDate() + 1);
   }
 
-  const availableHours = Number((workingDaysCount * hoursPerDay).toFixed(2));
+  const shiftHours = Number((workingDaysCount * shiftHoursPerDay).toFixed(1));
+  const totalBreakHours = Number((workingDaysCount * breakHoursPerDay).toFixed(1));
+  const availableHours = Number((workingDaysCount * netHoursPerDay).toFixed(1));
 
-  return { availableHours, workingDaysCount, holidayCount };
+  return {
+    availableHours,
+    shiftHours,
+    breakHours: totalBreakHours,
+    workingDaysCount,
+    holidayCount,
+  };
 }
 
 /**

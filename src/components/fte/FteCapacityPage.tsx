@@ -16,6 +16,7 @@ import {
   Briefcase,
   CheckSquare,
   UserCheck,
+  Eye,
 } from 'lucide-react';
 import {
   calculateAvailableWorkingHours,
@@ -24,6 +25,7 @@ import {
   getWorkloadStatus,
 } from '../../utils/calculations';
 import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
+import { EmployeeFteDetailsModal, EmployeeMetricItem } from './EmployeeFteDetailsModal';
 
 export const FteCapacityPage: React.FC = () => {
   const {
@@ -50,6 +52,7 @@ export const FteCapacityPage: React.FC = () => {
     isDeptManager ? currentUser.departmentId : ''
   );
   const [showConfigModal, setShowConfigModal] = useState(false);
+  const [selectedEmployeeForDetails, setSelectedEmployeeForDetails] = useState<EmployeeMetricItem | null>(null);
 
   // Local threshold edit state
   const [tempUnder, setTempUnder] = useState(workloadThresholds.underCapacity);
@@ -96,7 +99,7 @@ export const FteCapacityPage: React.FC = () => {
         workingSchedules.find(s => s.isDefault) ||
         workingSchedules[0];
 
-      const { availableHours, workingDaysCount, holidayCount } =
+      const { availableHours, shiftHours, breakHours, workingDaysCount, holidayCount } =
         calculateAvailableWorkingHours(
           dateRange.startDate,
           dateRange.endDate,
@@ -104,9 +107,12 @@ export const FteCapacityPage: React.FC = () => {
           holidays
         );
 
+      const shiftHoursPerDay = schedule?.hoursPerDay || 10;
+      const breakHoursPerDay = schedule?.breakHours !== undefined ? schedule.breakHours : 2;
+
       // Tasks in date range or assigned to user
       const userTasks = tasks.filter(t => t.assignedUserId === user.id);
-      const plannedHours = userTasks.reduce((sum, t) => sum + t.plannedHours, 0);
+      const plannedHours = userTasks.reduce((sum, t) => sum + (t.shiftHours || t.plannedHours || 0), 0);
 
       // Time sessions within date range
       const userSessions = timeSessions.filter(
@@ -131,6 +137,10 @@ export const FteCapacityPage: React.FC = () => {
         workingDaysCount,
         holidayCount,
         availableHours,
+        shiftHours,
+        shiftHoursPerDay,
+        breakHours,
+        breakHoursPerDay,
         plannedHours,
         actualHours,
         capacityVariance: Number((availableHours - actualHours).toFixed(1)),
@@ -151,6 +161,7 @@ export const FteCapacityPage: React.FC = () => {
 
   // Aggregate totals
   const totalAvailable = employeeMetrics.reduce((sum, m) => sum + m.availableHours, 0);
+  const totalShiftHours = employeeMetrics.reduce((sum, m) => sum + m.shiftHours, 0);
   const totalActual = employeeMetrics.reduce((sum, m) => sum + m.actualHours, 0);
   const totalPlanned = employeeMetrics.reduce((sum, m) => sum + m.plannedHours, 0);
   const aggregateFte = calculateFTE(totalActual, totalAvailable);
@@ -181,7 +192,7 @@ export const FteCapacityPage: React.FC = () => {
         task,
         periodHours,
         totalTaskActual: task.actualHours,
-        plannedHours: task.plannedHours,
+        plannedHours: task.shiftHours || task.plannedHours || 0,
         shareOfTotal,
       };
     }).filter(item => item.periodHours > 0 || (item.task.startDate && item.task.startDate <= dateRange.endDate && item.task.endDate && item.task.endDate >= dateRange.startDate));
@@ -208,8 +219,9 @@ export const FteCapacityPage: React.FC = () => {
       'Job Title': m.user.title,
       'Department': m.departmentName,
       'Working Days': m.workingDaysCount,
-      'Available Hours': m.availableHours,
-      'Planned Hours': m.plannedHours,
+      'Shift Hour (Total)': `${m.shiftHours}h (${m.shiftHoursPerDay}h/day)`,
+      'Break Hours': `${m.breakHours}h (2h/day: 1h lunch 12:00-1:00 PM, 30m AM, 30m PM)`,
+      'Available Net Capacity': `${m.availableHours}h (8h net/day)`,
       'Actual Tracked Hours': m.actualHours,
       'Variance (Available - Actual)': m.capacityVariance,
       'FTE (%)': `${m.fte}%`,
@@ -230,7 +242,8 @@ export const FteCapacityPage: React.FC = () => {
         },
         summaryKpis: {
           'Target Subject': isTaskUser ? `${currentUser.name} (${currentUser.employeeId})` : `${employeeMetrics.length} Employees`,
-          'Total Available Capacity': `${totalAvailable}h`,
+          'Total Shift Hours': `${totalShiftHours}h (10h/day shift)`,
+          'Total Available Capacity': `${totalAvailable}h (8h net/day)`,
           'Total Actual Logged': `${totalActual.toFixed(1)}h`,
           'FTE Utilization': `${aggregateFte}%`,
         },
@@ -248,8 +261,8 @@ export const FteCapacityPage: React.FC = () => {
     const columns = [
       { header: 'Employee', dataKey: 'name' },
       { header: 'Dept', dataKey: 'dept' },
+      { header: 'Shift (h)', dataKey: 'shift' },
       { header: 'Avail (h)', dataKey: 'avail' },
-      { header: 'Plan (h)', dataKey: 'plan' },
       { header: 'Actual (h)', dataKey: 'actual' },
       { header: 'FTE (%)', dataKey: 'fte' },
       { header: 'Status', dataKey: 'status' },
@@ -258,9 +271,9 @@ export const FteCapacityPage: React.FC = () => {
     const exportData = employeeMetrics.map(m => ({
       name: m.user.name,
       dept: m.departmentName,
-      avail: m.availableHours,
-      plan: m.plannedHours,
-      actual: m.actualHours,
+      shift: `${m.shiftHours}h`,
+      avail: `${m.availableHours}h`,
+      actual: `${m.actualHours}h`,
       fte: `${m.fte}%`,
       status: m.status,
     }));
@@ -440,7 +453,23 @@ export const FteCapacityPage: React.FC = () => {
               {primaryMetric?.workingDaysCount || 0}d
             </div>
             <span className="text-[10px] text-slate-400 truncate block" title={primaryMetric?.schedule?.name}>
-              {primaryMetric?.schedule?.name || 'Standard 8h'}
+              {primaryMetric?.schedule?.name || 'Standard 10h Shift'}
+            </span>
+          </div>
+
+          {/* Shift Hour */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-500 font-medium">Shift Hour</span>
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                {primaryMetric?.shiftHoursPerDay || 10}h/day
+              </span>
+            </div>
+            <div className="text-2xl font-bold text-slate-900 mt-1">
+              {primaryMetric?.shiftHours || 0}h
+            </div>
+            <span className="text-[10px] text-slate-400 block truncate" title="10h daily shift · 2h scheduled breaks (1h lunch 12:00-1:00 PM, 30m AM, 30m PM) → 8h net work">
+              {primaryMetric?.workingDaysCount || 0}d × {primaryMetric?.shiftHoursPerDay || 10}h (2h break/day)
             </span>
           </div>
 
@@ -448,14 +477,7 @@ export const FteCapacityPage: React.FC = () => {
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
             <span className="text-xs text-slate-500 font-medium">Available Capacity</span>
             <div className="text-2xl font-bold text-slate-900 mt-1">{totalAvailable}h</div>
-            <span className="text-[10px] text-slate-400">Scheduled standard hours</span>
-          </div>
-
-          {/* Planned Hours */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-            <span className="text-xs text-slate-500 font-medium">Planned Task Hours</span>
-            <div className="text-2xl font-bold text-slate-900 mt-1">{totalPlanned}h</div>
-            <span className="text-[10px] text-slate-400">Allocated to my tasks</span>
+            <span className="text-[10px] text-slate-400">8h net productive/day</span>
           </div>
 
           {/* Actual Tracked Hours */}
@@ -503,9 +525,15 @@ export const FteCapacityPage: React.FC = () => {
           </div>
 
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+            <span className="text-xs text-slate-500 font-medium">Shift Hour</span>
+            <div className="text-2xl font-bold text-slate-900 mt-1">{totalShiftHours}h</div>
+            <span className="text-[10px] text-slate-400">10h/day shift schedule</span>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
             <span className="text-xs text-slate-500 font-medium">Total Available Hours</span>
             <div className="text-2xl font-bold text-slate-900 mt-1">{totalAvailable}h</div>
-            <span className="text-[10px] text-slate-400">8h/day standard</span>
+            <span className="text-[10px] text-slate-400">8h/day net standard</span>
           </div>
 
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
@@ -520,17 +548,17 @@ export const FteCapacityPage: React.FC = () => {
             <span className="text-[10px] text-blue-200">Overall utilization</span>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs col-span-2 flex flex-col justify-between">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
             <span className="text-xs text-slate-500 font-medium">Workload Distribution</span>
-            <div className="grid grid-cols-3 gap-2 text-center text-xs mt-1">
-              <div className="p-1.5 bg-blue-50 text-blue-800 rounded-lg">
-                <span className="font-bold">{underCount}</span> Under
+            <div className="grid grid-cols-3 gap-1 text-center text-[11px] mt-1">
+              <div className="p-1 bg-blue-50 text-blue-800 rounded">
+                <span className="font-bold block">{underCount}</span> Under
               </div>
-              <div className="p-1.5 bg-emerald-50 text-emerald-800 rounded-lg">
-                <span className="font-bold">{nearCount}</span> Near
+              <div className="p-1 bg-emerald-50 text-emerald-800 rounded">
+                <span className="font-bold block">{nearCount}</span> Near
               </div>
-              <div className="p-1.5 bg-rose-50 text-rose-800 rounded-lg">
-                <span className="font-bold">{overCount}</span> Over
+              <div className="p-1 bg-rose-50 text-rose-800 rounded">
+                <span className="font-bold block">{overCount}</span> Over
               </div>
             </div>
           </div>
@@ -556,12 +584,13 @@ export const FteCapacityPage: React.FC = () => {
                 <th className="py-3 px-4 font-semibold">Employee</th>
                 <th className="py-3 px-4 font-semibold">Department</th>
                 <th className="py-3 px-4 font-semibold text-center">Work Days</th>
+                <th className="py-3 px-4 font-semibold text-right">Shift Hour (h)</th>
                 <th className="py-3 px-4 font-semibold text-right">Available Cap (h)</th>
-                <th className="py-3 px-4 font-semibold text-right">Planned (h)</th>
                 <th className="py-3 px-4 font-semibold text-right">Actual Tracked (h)</th>
                 <th className="py-3 px-4 font-semibold text-right">Var (Avail - Act)</th>
                 <th className="py-3 px-4 font-semibold text-right">FTE %</th>
                 <th className="py-3 px-4 font-semibold">Capacity Status</th>
+                <th className="py-3 px-4 font-semibold text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -581,10 +610,16 @@ export const FteCapacityPage: React.FC = () => {
                       {item.workingDaysCount}d
                     </td>
                     <td className="py-3 px-4 text-right font-mono text-slate-700">
-                      {item.availableHours}h
+                      <span className="font-semibold">{item.shiftHours}h</span>
+                      <span className="block text-[10px] text-slate-400 font-sans">
+                        {item.shiftHoursPerDay}h/day
+                      </span>
                     </td>
-                    <td className="py-3 px-4 text-right font-mono text-slate-600">
-                      {item.plannedHours}h
+                    <td className="py-3 px-4 text-right font-mono text-slate-700">
+                      <span className="font-semibold">{item.availableHours}h</span>
+                      <span className="block text-[10px] text-slate-400 font-sans">
+                        8h net/day
+                      </span>
                     </td>
                     <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
                       {item.actualHours}h
@@ -628,6 +663,16 @@ export const FteCapacityPage: React.FC = () => {
                         {item.status}
                       </span>
                     </td>
+                    <td className="py-3 px-4 text-center">
+                      <button
+                        onClick={() => setSelectedEmployeeForDetails(item)}
+                        title="View Details"
+                        className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 border border-blue-200 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5 font-semibold text-xs shadow-2xs"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>View Details</span>
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
@@ -664,7 +709,7 @@ export const FteCapacityPage: React.FC = () => {
                     <th className="py-3 px-4 font-semibold">Task ID & Name</th>
                     <th className="py-3 px-4 font-semibold">Work Type</th>
                     <th className="py-3 px-4 font-semibold">Status</th>
-                    <th className="py-3 px-4 font-semibold text-right">Planned (h)</th>
+                    <th className="py-3 px-4 font-semibold text-right">Shift Hour (h)</th>
                     <th className="py-3 px-4 font-semibold text-right">Logged in Period (h)</th>
                     <th className="py-3 px-4 font-semibold text-right">Total Task Actual (h)</th>
                     <th className="py-3 px-4 font-semibold text-right">% of My Period Time</th>
@@ -786,6 +831,19 @@ export const FteCapacityPage: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Employee Details Modal (Task Information & Logs) */}
+      {selectedEmployeeForDetails && (
+        <EmployeeFteDetailsModal
+          isOpen={!!selectedEmployeeForDetails}
+          onClose={() => setSelectedEmployeeForDetails(null)}
+          employeeMetric={selectedEmployeeForDetails}
+          tasks={tasks}
+          timeSessions={timeSessions}
+          dateRange={dateRange}
+          periodLabel={period}
+        />
       )}
     </div>
   );

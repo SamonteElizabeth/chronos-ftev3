@@ -40,6 +40,7 @@ type SortField =
   | 'assignedUserId'
   | 'startDate'
   | 'endDate'
+  | 'shiftHours'
   | 'plannedHours'
   | 'actualHours'
   | 'variance'
@@ -60,6 +61,10 @@ export const TaskManagementPage: React.FC<TaskManagementPageProps> = ({
     keepOnlySampleTasks,
     currentUser,
   } = useApp();
+
+  // Role checks
+  const isTaskUser = currentUser.role === 'TASK_USER';
+  const isDeptManager = currentUser.role === 'DEPT_MANAGER';
 
   // Search and Filter states
   const [search, setSearch] = useState('');
@@ -89,10 +94,23 @@ export const TaskManagementPage: React.FC<TaskManagementPageProps> = ({
     }
   };
 
+  // Base accessible tasks according to role
+  const accessibleTasks = useMemo(() => {
+    if (isTaskUser) {
+      return tasks.filter(t => t.assignedUserId === currentUser.id);
+    }
+    if (isDeptManager) {
+      return tasks.filter(t => t.departmentId === currentUser.departmentId);
+    }
+    return tasks;
+  }, [tasks, isTaskUser, isDeptManager, currentUser]);
+
   const filteredTasks = useMemo(() => {
-    return tasks.filter(task => {
-      if (selectedDept && task.departmentId !== selectedDept) return false;
-      if (selectedUser && task.assignedUserId !== selectedUser) return false;
+    return accessibleTasks.filter(task => {
+      if (!isTaskUser) {
+        if (selectedDept && task.departmentId !== selectedDept) return false;
+        if (selectedUser && task.assignedUserId !== selectedUser) return false;
+      }
       if (selectedStatus && task.status !== selectedStatus) return false;
       if (onlyOverdue && !isTaskOverdue(task)) return false;
 
@@ -106,7 +124,8 @@ export const TaskManagementPage: React.FC<TaskManagementPageProps> = ({
       return true;
     });
   }, [
-    tasks,
+    accessibleTasks,
+    isTaskUser,
     selectedDept,
     selectedUser,
     selectedStatus,
@@ -119,15 +138,20 @@ export const TaskManagementPage: React.FC<TaskManagementPageProps> = ({
       let valA: any = a[sortField];
       let valB: any = b[sortField];
 
-      if (typeof valA === 'string') {
-        return sortDirection === 'asc'
-          ? valA.localeCompare(valB)
-          : valB.localeCompare(valA);
+      if (valA === undefined || valA === null) valA = '';
+      if (valB === undefined || valB === null) valB = '';
+
+      if (typeof valA === 'number' || typeof valB === 'number') {
+        const numA = Number(valA) || 0;
+        const numB = Number(valB) || 0;
+        return sortDirection === 'asc' ? numA - numB : numB - numA;
       }
-      if (typeof valA === 'number') {
-        return sortDirection === 'asc' ? valA - valB : valB - valA;
-      }
-      return 0;
+
+      const strA = String(valA);
+      const strB = String(valB);
+      return sortDirection === 'asc'
+        ? strA.localeCompare(strB)
+        : strB.localeCompare(strA);
     });
   }, [filteredTasks, sortField, sortDirection]);
 
@@ -152,6 +176,7 @@ export const TaskManagementPage: React.FC<TaskManagementPageProps> = ({
     const exportData = sortedTasks.map(t => {
       const u = users.find(usr => usr.id === t.assignedUserId);
       const d = departments.find(dept => dept.id === t.departmentId);
+      const shiftH = t.shiftHours || t.plannedHours || 0;
       return {
         'Task ID': t.id,
         'Task Name': t.taskName,
@@ -161,7 +186,7 @@ export const TaskManagementPage: React.FC<TaskManagementPageProps> = ({
         'Department': d?.name || t.departmentId,
         'Start Date': t.startDate,
         'End Date': t.endDate || 'N/A',
-        'Planned (Hours)': t.plannedHours,
+        'Shift Hour': shiftH,
         'Actual (Hours)': t.actualHours,
         'Variance (Hours)': t.variance,
         'Variance (%)': `${t.variancePercent}%`,
@@ -173,23 +198,29 @@ export const TaskManagementPage: React.FC<TaskManagementPageProps> = ({
 
     exportToExcel(
       {
-        reportName: 'Task Master List & Effort Tracking',
+        reportName: isTaskUser ? 'My Task List & Effort Tracking' : 'Task Master List & Effort Tracking',
         generatedDate: new Date().toLocaleString(),
         generatedBy: `${currentUser.name} (${currentUser.role})`,
-        filtersApplied: {
-          Department: departments.find(d => d.id === selectedDept)?.name || 'All',
-          Employee: users.find(u => u.id === selectedUser)?.name || 'All',
-          Status: selectedStatus || 'All',
-          OverdueOnly: onlyOverdue ? 'Yes' : 'No',
-        },
+        filtersApplied: isTaskUser
+          ? {
+              Scope: 'My Assigned Tasks',
+              Status: selectedStatus || 'All',
+              OverdueOnly: onlyOverdue ? 'Yes' : 'No',
+            }
+          : {
+              Department: departments.find(d => d.id === selectedDept)?.name || 'All',
+              Employee: users.find(u => u.id === selectedUser)?.name || 'All',
+              Status: selectedStatus || 'All',
+              OverdueOnly: onlyOverdue ? 'Yes' : 'No',
+            },
         summaryKpis: {
           'Total Tasks': sortedTasks.length,
-          'Total Planned Hours': `${sortedTasks.reduce((sum, t) => sum + t.plannedHours, 0)}h`,
+          'Total Shift Hours': `${sortedTasks.reduce((sum, t) => sum + (t.shiftHours || t.plannedHours || 0), 0)}h`,
           'Total Actual Hours': `${sortedTasks.reduce((sum, t) => sum + t.actualHours, 0).toFixed(1)}h`,
         },
       },
       exportData,
-      'Task_Management_Export'
+      isTaskUser ? 'My_Task_List_Export' : 'Task_Management_Export'
     );
   };
 
@@ -201,7 +232,6 @@ export const TaskManagementPage: React.FC<TaskManagementPageProps> = ({
       { header: 'Dept', dataKey: 'department' },
       { header: 'Start', dataKey: 'startDate' },
       { header: 'End', dataKey: 'endDate' },
-      { header: 'Plan(h)', dataKey: 'plannedHours' },
       { header: 'Act(h)', dataKey: 'actualHours' },
       { header: 'Var(h)', dataKey: 'variance' },
       { header: 'Status', dataKey: 'status' },
@@ -217,7 +247,6 @@ export const TaskManagementPage: React.FC<TaskManagementPageProps> = ({
         department: d?.code || t.departmentId,
         startDate: t.startDate,
         endDate: t.endDate || '—',
-        plannedHours: t.plannedHours,
         actualHours: t.actualHours,
         variance: t.variance > 0 ? `+${t.variance}` : t.variance,
         status: t.status,
@@ -226,22 +255,26 @@ export const TaskManagementPage: React.FC<TaskManagementPageProps> = ({
 
     exportToPDF(
       {
-        reportName: 'Task Master List & Effort Tracking',
+        reportName: isTaskUser ? 'My Task List & Effort Tracking' : 'Task Master List & Effort Tracking',
         generatedDate: new Date().toLocaleString(),
         generatedBy: `${currentUser.name} (${currentUser.role})`,
-        filtersApplied: {
-          Department: departments.find(d => d.id === selectedDept)?.name || 'All',
-          Status: selectedStatus || 'All',
-        },
+        filtersApplied: isTaskUser
+          ? {
+              Scope: 'My Assigned Tasks',
+              Status: selectedStatus || 'All',
+            }
+          : {
+              Department: departments.find(d => d.id === selectedDept)?.name || 'All',
+              Status: selectedStatus || 'All',
+            },
         summaryKpis: {
           'Total Tasks': sortedTasks.length,
-          'Total Planned': `${sortedTasks.reduce((sum, t) => sum + t.plannedHours, 0)}h`,
           'Total Actual': `${sortedTasks.reduce((sum, t) => sum + t.actualHours, 0).toFixed(1)}h`,
         },
       },
       columns,
       exportData,
-      'Task_Management_Export'
+      isTaskUser ? 'My_Task_List_Report' : 'Task_Management_Report'
     );
   };
 
@@ -363,51 +396,56 @@ export const TaskManagementPage: React.FC<TaskManagementPageProps> = ({
 
       {/* Filter and Search Bar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+        <div className={`grid grid-cols-1 ${isTaskUser ? 'sm:grid-cols-2' : 'sm:grid-cols-2 md:grid-cols-4'} gap-3 text-xs`}>
           {/* Search */}
           <div className="relative">
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search tasks..."
+              placeholder={isTaskUser ? 'Search my tasks...' : 'Search tasks...'}
               className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
             />
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-3" />
           </div>
 
-          {/* Department */}
-          <select
-            value={selectedDept}
-            onChange={e => {
-              setSelectedDept(e.target.value);
-              setSelectedUser('');
-            }}
-            className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
-          >
-            <option value="">All Departments</option>
-            {departments.map(d => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
+          {/* Department and Employee (Only for Admins / Managers) */}
+          {!isTaskUser && (
+            <>
+              {/* Department */}
+              <select
+                value={selectedDept}
+                onChange={e => {
+                  setSelectedDept(e.target.value);
+                  setSelectedUser('');
+                }}
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
+              >
+                <option value="">All Departments</option>
+                {departments.map(d => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
 
-          {/* Employee */}
-          <select
-            value={selectedUser}
-            onChange={e => setSelectedUser(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
-          >
-            <option value="">All Employees</option>
-            {users
-              .filter(u => (!selectedDept || u.departmentId === selectedDept) && u.status === 'Active')
-              .map(u => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
-          </select>
+              {/* Employee */}
+              <select
+                value={selectedUser}
+                onChange={e => setSelectedUser(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 bg-white text-slate-800"
+              >
+                <option value="">All Employees</option>
+                {users
+                  .filter(u => (!selectedDept || u.departmentId === selectedDept) && u.status === 'Active')
+                  .map(u => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+              </select>
+            </>
+          )}
 
           {/* Status */}
           <select
@@ -440,7 +478,7 @@ export const TaskManagementPage: React.FC<TaskManagementPageProps> = ({
             </button>
             <span className="text-slate-400">|</span>
             <span className="text-slate-500 font-medium">
-              Showing <strong>{sortedTasks.length}</strong> of {tasks.length} tasks
+              Showing <strong>{sortedTasks.length}</strong> of {accessibleTasks.length} {isTaskUser ? 'assigned task(s)' : 'tasks'}
             </span>
           </div>
 
@@ -516,11 +554,11 @@ export const TaskManagementPage: React.FC<TaskManagementPageProps> = ({
                   </div>
                 </th>
                 <th
-                  onClick={() => handleSort('plannedHours')}
+                  onClick={() => handleSort('shiftHours')}
                   className="py-3 px-3.5 font-semibold cursor-pointer hover:text-blue-600 text-right"
                 >
                   <div className="flex items-center justify-end gap-1">
-                    Planned <ArrowUpDown className="w-3 h-3" />
+                    Shift Hour <ArrowUpDown className="w-3 h-3" />
                   </div>
                 </th>
                 <th
@@ -623,8 +661,8 @@ export const TaskManagementPage: React.FC<TaskManagementPageProps> = ({
                           <span className="text-xs text-slate-400 italic">No Due Date</span>
                         )}
                       </td>
-                      <td className="py-3 px-3.5 text-slate-700 text-right font-mono">
-                        {task.plannedHours}h
+                      <td className="py-3 px-3.5 text-slate-700 font-medium text-right font-mono">
+                        {task.shiftHours || task.plannedHours || 0}h
                       </td>
                       <td className="py-3 px-3.5 font-bold text-slate-900 text-right font-mono">
                         {task.actualHours}h

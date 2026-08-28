@@ -142,7 +142,8 @@ export const TimeCorrectionModal: React.FC<TimeCorrectionModalProps> = ({
   const oldSessionHours = sessionToEdit && sessionToEdit.taskId === taskId ? sessionToEdit.durationHours : 0;
   const newHours = calculation.valid ? calculation.hours : 0;
   const projectedTaskActual = Number((currentTaskActual - oldSessionHours + newHours).toFixed(2));
-  const projectedVariance = selectedTask ? Number((projectedTaskActual - selectedTask.plannedHours).toFixed(2)) : 0;
+  const taskShiftHours = selectedTask ? (selectedTask.shiftHours || selectedTask.plannedHours || 0) : 0;
+  const projectedVariance = selectedTask ? Number((projectedTaskActual - taskShiftHours).toFixed(2)) : 0;
 
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
@@ -423,10 +424,10 @@ export const TimeCorrectionModal: React.FC<TimeCorrectionModalProps> = ({
             {selectedTask && calculation.valid && (
               <div className="mt-2.5 pt-2.5 border-t border-slate-200/70 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-600">
                 <span>
-                  Planned: <strong>{selectedTask.plannedHours}h</strong> | Current Actual: <strong>{selectedTask.actualHours}h</strong>
+                  Shift Hour: <strong>{taskShiftHours}h</strong> | Current Actual: <strong>{selectedTask.actualHours}h</strong>
                 </span>
                 <span>
-                  Projected Actual:{' '}
+                  Updated Task Actual:{' '}
                   <strong className="text-slate-900 font-bold">{projectedTaskActual}h</strong>{' '}
                   <span className={`font-semibold ${projectedVariance > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
                     ({projectedVariance > 0 ? `+${projectedVariance}h` : `${projectedVariance}h`})

@@ -192,26 +192,49 @@ export const WorkScheduleSettingsModal: React.FC<WorkScheduleSettingsModalProps>
       updateWorkingSchedule(userSchedule.id, {
         name: scheduleName,
         hoursPerDay: durationHours,
+        netWorkHoursPerDay: durationHours >= 2 ? durationHours - 2 : durationHours,
         workingDays: newWorkingDays,
         startTime: startTime24,
         endTime: endTime24,
+        breakHours: 2,
+        breakBreakdown: {
+          lunchBreakMinutes: 60,
+          lunchTimeRange: '12:00 PM - 01:00 PM',
+          morningBreakMinutes: 30,
+          morningTimeRange: '10:00 AM - 10:30 AM',
+          afternoonBreakMinutes: 30,
+          afternoonTimeRange: '03:00 PM - 03:30 PM',
+        },
       });
     } else {
       const newSchedId = `SCH-USR-${user.id}`;
       createWorkingSchedule({
         name: scheduleName,
         hoursPerDay: durationHours,
+        netWorkHoursPerDay: durationHours >= 2 ? durationHours - 2 : durationHours,
         workingDays: newWorkingDays,
         startTime: startTime24,
         endTime: endTime24,
-        breakHours: 0,
+        breakHours: 2,
+        breakBreakdown: {
+          lunchBreakMinutes: 60,
+          lunchTimeRange: '12:00 PM - 01:00 PM',
+          morningBreakMinutes: 30,
+          morningTimeRange: '10:00 AM - 10:30 AM',
+          afternoonBreakMinutes: 30,
+          afternoonTimeRange: '03:00 PM - 03:30 PM',
+        },
       });
       updateUser(user.id, {
         workingScheduleId: newSchedId,
       });
     }
 
-    showToast('success', 'Work Schedule Updated', `Work schedule set to ${startTimeDisplay} - ${endTimeDisplay} (${durationHours} hours).`);
+    showToast(
+      'success',
+      'Work Schedule Updated',
+      `Work schedule set to ${startTimeDisplay} - ${endTimeDisplay} (${durationHours} hours shift with 2h scheduled breaks).`
+    );
     onClose();
   };
 
@@ -304,10 +327,40 @@ export const WorkScheduleSettingsModal: React.FC<WorkScheduleSettingsModalProps>
             </div>
           </div>
 
-          {/* Work Duration Row */}
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-800 pt-1 pb-1">
-            <span>Work Duration</span>
-            <span className="text-slate-900">{durationHours} hours</span>
+          {/* Work Duration & Net Working Hours */}
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-2">
+            <div className="flex items-center justify-between text-xs font-semibold text-slate-800">
+              <span>Shift Duration</span>
+              <span className="text-slate-900 font-mono font-bold">{durationHours} hours</span>
+            </div>
+
+            {/* Scheduled Breaks Section */}
+            <div className="pt-2 border-t border-slate-200/60 text-[11px] space-y-1.5">
+              <div className="flex items-center justify-between text-slate-600 font-medium">
+                <span>Scheduled Breaks:</span>
+                <span className="font-bold text-slate-800 font-mono">2.0 hours total</span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5 text-[10px]">
+                <div className="bg-white p-1.5 rounded-md border border-slate-200/70 text-center">
+                  <span className="text-slate-500 block">Morning</span>
+                  <span className="font-semibold text-slate-700">30 mins</span>
+                </div>
+                <div className="bg-blue-50/70 p-1.5 rounded-md border border-blue-200/60 text-center">
+                  <span className="text-blue-700 font-semibold block">Lunch (12-1 PM)</span>
+                  <span className="font-bold text-blue-900">1 hour</span>
+                </div>
+                <div className="bg-white p-1.5 rounded-md border border-slate-200/70 text-center">
+                  <span className="text-slate-500 block">Afternoon</span>
+                  <span className="font-semibold text-slate-700">30 mins</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between text-[11px] text-emerald-700 font-semibold pt-1">
+                <span>Net Productive Work Time:</span>
+                <span className="font-mono font-bold">
+                  {Math.max(0, durationHours - 2).toFixed(1)} hours/day
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Rest Days (1-2 required) */}

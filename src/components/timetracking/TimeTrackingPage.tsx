@@ -46,6 +46,20 @@ export const TimeTrackingPage: React.FC<TimeTrackingPageProps> = ({
   const [activeStatusTab, setActiveStatusTab] = useState<StatusFilterTab>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
+  const isTaskUser = currentUser.role === 'TASK_USER';
+  const isDeptManager = currentUser.role === 'DEPT_MANAGER';
+
+  // Accessible tasks scoped by role
+  const accessibleTasks = useMemo(() => {
+    if (isTaskUser) {
+      return tasks.filter(t => t.assignedUserId === currentUser.id);
+    }
+    if (isDeptManager) {
+      return tasks.filter(t => t.departmentId === currentUser.departmentId);
+    }
+    return tasks;
+  }, [tasks, isTaskUser, isDeptManager, currentUser]);
+
   // Status mapping helper
   const mapStatusToTab = (status: TaskStatus): StatusFilterTab => {
     switch (status) {
@@ -66,24 +80,24 @@ export const TimeTrackingPage: React.FC<TimeTrackingPageProps> = ({
   // Status Counts
   const statusCounts = useMemo(() => {
     const counts = {
-      all: tasks.length,
+      all: accessibleTasks.length,
       assigned: 0,
       pending: 0,
       ongoing: 0,
       completed: 0,
     };
 
-    tasks.forEach(t => {
+    accessibleTasks.forEach(t => {
       const tab = mapStatusToTab(t.status);
       counts[tab] = (counts[tab] || 0) + 1;
     });
 
     return counts;
-  }, [tasks]);
+  }, [accessibleTasks]);
 
   // Filtered Tasks
   const filteredTasks = useMemo(() => {
-    return tasks.filter(task => {
+    return accessibleTasks.filter(task => {
       // Filter by tab
       if (activeStatusTab !== 'all') {
         const tab = mapStatusToTab(task.status);
@@ -101,7 +115,7 @@ export const TimeTrackingPage: React.FC<TimeTrackingPageProps> = ({
 
       return true;
     });
-  }, [tasks, activeStatusTab, search]);
+  }, [accessibleTasks, activeStatusTab, search]);
 
   // Handle Mark Finished
   const handleToggleFinished = (task: Task) => {

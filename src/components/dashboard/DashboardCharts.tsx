@@ -276,11 +276,11 @@ export const DepartmentCapacityChart: React.FC<DeptCapacityChartProps> = ({ data
 };
 
 // 5. Effort Variance Chart
-interface ProjectVarianceChartProps {
+interface EffortVarianceChartProps {
   data: { name: string; plannedHours: number; actualHours: number }[];
 }
 
-export const ProjectVarianceChart: React.FC<ProjectVarianceChartProps> = ({ data }) => {
+export const EffortVarianceChart: React.FC<EffortVarianceChartProps> = ({ data }) => {
   if (data.length === 0) {
     return (
       <div className="h-56 flex items-center justify-center text-slate-400 text-xs">
@@ -309,7 +309,7 @@ export const ProjectVarianceChart: React.FC<ProjectVarianceChartProps> = ({ data
           <Tooltip content={<CustomChartTooltip />} />
           <Bar
             dataKey="plannedHours"
-            name="Planned Budget"
+            name="Shift Hours"
             fill="#94a3b8"
             radius={[4, 4, 0, 0]}
             unit="h"
@@ -326,6 +326,8 @@ export const ProjectVarianceChart: React.FC<ProjectVarianceChartProps> = ({ data
     </div>
   );
 };
+
+export const ProjectVarianceChart = EffortVarianceChart;
 
 // 6. Workload Distribution Donut
 interface WorkloadPieProps {
