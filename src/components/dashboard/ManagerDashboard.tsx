@@ -468,26 +468,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
     }));
   }, [employeeUtilizationData]);
 
-  // ================= 9. TIME ALLOCATION BY WORK TYPE =================
-  const timeAllocationData = useMemo(() => {
-    const allocationMap: Record<string, number> = {};
-
-    filteredTasks.forEach(task => {
-      const type = task.taskType || task.requestType || 'Other';
-      allocationMap[type] = (allocationMap[type] || 0) + (task.actualHours || 0);
-    });
-
-    const items = Object.entries(allocationMap).map(([name, hours]) => ({
-      name,
-      hours: Number(hours.toFixed(1)),
-      percentage: totalActualHours > 0 ? Number(((hours / totalActualHours) * 100).toFixed(1)) : 0,
-      color: WORK_TYPE_COLORS[name] || '#64748B',
-    }));
-
-    return items.sort((a, b) => b.hours - a.hours);
-  }, [filteredTasks, totalActualHours]);
-
-  // ================= 10. OVERDUE TASKS BY DEPARTMENT =================
+  // ================= OVERDUE TASKS BY DEPARTMENT =================
   const overdueTasksByDeptData = useMemo(() => {
     return departmentFteData.map(d => ({
       id: d.id,
@@ -1263,79 +1244,6 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
               <span className="font-semibold text-slate-700">
                 Average Shift Load: {employeeWorkloadData.length > 0 ? (totalPlannedHours / employeeWorkloadData.length).toFixed(1) : 0}h per person
               </span>
-            </div>
-          </div>
-
-          {/* 8. Time Allocation by Work Type (Landscape Card) */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <h3 className="text-base font-bold text-slate-900">Time Allocation by Work Type</h3>
-                <p className="text-xs text-slate-500">Tracked effort breakdown by functional stream</p>
-              </div>
-              <span className="text-xs font-semibold px-3 py-1 bg-slate-100 text-slate-700 rounded-lg">
-                Total Effort: <strong>{totalActualHours.toFixed(1)} Hours</strong>
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center pt-2">
-              <div className="lg:col-span-5 h-64 relative flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={timeAllocationData}
-                      innerRadius={68}
-                      outerRadius={102}
-                      paddingAngle={2}
-                      dataKey="hours"
-                    >
-                      {timeAllocationData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload;
-                          return (
-                            <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl text-xs border border-slate-700 space-y-1">
-                              <p className="font-bold text-sm" style={{ color: data.color }}>{data.name}</p>
-                              <p className="text-slate-200">Tracked: <strong>{data.hours} hours</strong></p>
-                              <p className="text-slate-300">Share: <strong>{data.percentage}%</strong></p>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute text-center pointer-events-none">
-                  <span className="text-2xl font-bold text-slate-900 block leading-tight">{totalActualHours.toFixed(0)}h</span>
-                  <span className="text-[10px] text-slate-400 font-semibold uppercase">Tracked</span>
-                </div>
-              </div>
-
-              <div className="lg:col-span-7 grid grid-cols-2 sm:grid-cols-3 gap-3.5 text-xs">
-                {timeAllocationData.map(item => (
-                  <div
-                    key={item.name}
-                    className="p-3.5 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200/70 transition-colors"
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                      <span className="font-bold text-slate-800 truncate">{item.name}</span>
-                    </div>
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-base font-bold text-slate-900">{item.hours}h</span>
-                      <span className="text-[11px] font-semibold text-slate-500">{item.percentage}%</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-slate-200 rounded-full mt-2 overflow-hidden">
-                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${item.percentage}%`, backgroundColor: item.color }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         </div>
