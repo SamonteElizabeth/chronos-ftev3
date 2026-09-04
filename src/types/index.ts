@@ -150,9 +150,11 @@ export interface TaskCategoryConfig {
   priorities: TaskPriority[];
 }
 
+export type CapacityStatus = 'Under Capacity' | 'At Capacity' | 'Over Capacity';
+
 export interface WorkloadThresholds {
-  underCapacity: number; // default: 80%
-  overCapacity: number;  // default: 100%
+  underCapacity: number; // default: 100% (< 100% is Under Capacity)
+  overCapacity: number;  // default: 100% (> 100% is Over Capacity, = 100% is At Capacity)
 }
 
 export interface AuditLog {

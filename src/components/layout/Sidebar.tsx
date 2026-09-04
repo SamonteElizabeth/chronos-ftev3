@@ -98,7 +98,7 @@ export const Sidebar = ({
       id: 'fte',
       label: 'FTE & Utilization',
       icon: <PieChart className="w-4 h-4" />,
-      allowedRoles: ['ADMIN', 'MANAGER', 'DEPT_MANAGER', 'TASK_USER'],
+      allowedRoles: ['ADMIN', 'MANAGER', 'DEPT_MANAGER'],
     },
     {
       id: 'users',
@@ -133,13 +133,12 @@ export const Sidebar = ({
         {/* Brand Logo & Title */}
         <div className="h-16 px-6 flex items-center gap-3 border-b border-slate-700/60 shrink-0">
           <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center font-bold text-white text-base shadow-sm">
-            F
+            C
           </div>
           <div>
             <h1 className="text-white font-semibold text-base leading-tight uppercase tracking-tight">
-              FTE Tracker
+              Chronos v3
             </h1>
-            <span className="text-[10px] text-slate-400 font-medium">Enterprise Management</span>
           </div>
         </div>
 
@@ -178,8 +177,8 @@ export const Sidebar = ({
             );
           })}
 
-          {/* Maintenance Table Module (Admin Only) */}
-          {role === 'ADMIN' && (
+          {/* Maintenance Table Module (Admin & Dept Manager) */}
+          {(role === 'ADMIN' || role === 'DEPT_MANAGER') && (
             <div className="pt-1">
               {/* Maintenance Table Parent Item */}
               <div
@@ -191,7 +190,7 @@ export const Sidebar = ({
                   <button
                     onClick={() => {
                       if (activeTab !== 'maintenance') {
-                        handleNavClick('maintenance', maintenanceSubTab);
+                        handleNavClick('maintenance', role === 'DEPT_MANAGER' ? 'task-names' : maintenanceSubTab);
                         setIsMaintenanceExpanded(true);
                       } else {
                         setIsMaintenanceExpanded(!isMaintenanceExpanded);
@@ -233,18 +232,20 @@ export const Sidebar = ({
                       <span>Task Name</span>
                     </button>
 
-                    {/* Sub-module: Department */}
-                    <button
-                      onClick={() => handleNavClick('maintenance', 'departments')}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                        activeTab === 'maintenance' && maintenanceSubTab === 'departments'
-                          ? 'bg-blue-500 text-white font-semibold shadow-xs'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-[#334155]'
-                      }`}
-                    >
-                      <Building2 className="w-3.5 h-3.5" />
-                      <span>Department</span>
-                    </button>
+                    {/* Sub-module: Department (Admin Only) */}
+                    {role === 'ADMIN' && (
+                      <button
+                        onClick={() => handleNavClick('maintenance', 'departments')}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                          activeTab === 'maintenance' && maintenanceSubTab === 'departments'
+                            ? 'bg-blue-500 text-white font-semibold shadow-xs'
+                            : 'text-slate-400 hover:text-slate-200 hover:bg-[#334155]'
+                        }`}
+                      >
+                        <Building2 className="w-3.5 h-3.5" />
+                        <span>Department</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

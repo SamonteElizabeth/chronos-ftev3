@@ -9,7 +9,6 @@ import {
   Calendar,
   Layers,
   FileSpreadsheet,
-  FileText,
   UserCheck,
   CheckCircle2,
   AlertTriangle,
@@ -26,7 +25,7 @@ import {
 } from 'lucide-react';
 import { TimeCorrectionModal } from './TimeCorrectionModal';
 import { ConfirmModal } from '../common/ConfirmModal';
-import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
+import { exportToExcel } from '../../utils/exportUtils';
 
 interface TimeCorrectionPageProps {
   onViewTask?: (task: Task) => void;
@@ -291,57 +290,6 @@ export const TimeCorrectionPage: React.FC<TimeCorrectionPageProps> = ({
     );
   };
 
-  const handleExportPDF = () => {
-    const columns = [
-      { header: 'Session ID', dataKey: 'id' },
-      { header: 'Type', dataKey: 'entryType' },
-      { header: 'Scenario', dataKey: 'type' },
-      { header: 'Employee', dataKey: 'employee' },
-      { header: 'Task Name', dataKey: 'task' },
-      { header: 'Date', dataKey: 'date' },
-      { header: 'Duration', dataKey: 'duration' },
-      { header: 'Reason & Justification', dataKey: 'reason' },
-    ];
-
-    const data = filteredSessions.map(s => {
-      const task = tasks.find(t => t.id === s.taskId);
-      const user = users.find(u => u.id === s.userId);
-      const entryType = s.timeEntryType || (s.isOvertime ? 'OT' : 'Regular');
-      return {
-        id: s.id,
-        entryType: entryType,
-        type: s.isManual ? (s.correctionType || 'Time Correction') : 'Live Timer',
-        employee: user?.name || s.userId,
-        task: task?.taskName ? (task.taskName.length > 25 ? task.taskName.substring(0, 25) + '...' : task.taskName) : s.taskId,
-        date: s.startTime.split('T')[0],
-        duration: `+${s.durationHours}h`,
-        reason: s.manualReason || s.notes || 'N/A',
-      };
-    });
-
-    exportToPDF(
-      {
-        reportName: 'Time Correction & Retroactive Time Logs',
-        generatedDate: new Date().toLocaleDateString(),
-        generatedBy: `${currentUser.name} (${currentUser.role})`,
-        filtersApplied: {
-          Period: period,
-          Employee: filterUser,
-          'Time Entry Type': filterEntryType,
-          Scenario: filterScenario,
-          Scope: viewScope,
-        },
-        summaryKpis: {
-          'Total Logged Hours': `${stats.filteredHours}h`,
-          'Total Entries': stats.filteredCount,
-        },
-      },
-      columns,
-      data,
-      'Time_Corrections_Report'
-    );
-  };
-
   return (
     <div className="space-y-6">
       {/* Top Banner & Header */}
@@ -363,15 +311,6 @@ export const TimeCorrectionPage: React.FC<TimeCorrectionPageProps> = ({
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
             <span>Excel</span>
-          </button>
-
-          <button
-            onClick={handleExportPDF}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors cursor-pointer"
-            title="Export to PDF"
-          >
-            <FileText className="w-3.5 h-3.5 text-rose-600" />
-            <span>PDF</span>
           </button>
 
           <button
@@ -807,15 +746,19 @@ export const TimeCorrectionPage: React.FC<TimeCorrectionPageProps> = ({
         )}
       </div>
 
-      {/* Compliance & FTE Guidance Callout */}
+      {/* Compliance & Synchronization Guidance Callout */}
       <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-start gap-3 text-slate-600">
         <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
         <div className="text-xs space-y-1">
           <p className="font-semibold text-slate-800">
-            Automated Synchronization with FTE & Task Calculations
+            {currentUser.role === 'TASK_USER'
+              ? 'Automated Synchronization with Task Calculations'
+              : 'Automated Synchronization with FTE & Task Calculations'}
           </p>
           <p className="text-slate-500 leading-relaxed">
-            Every time correction saved in this module immediately updates the target task's <strong className="text-slate-700">Actual Hours</strong>, recalculates <strong className="text-slate-700">Variance & Variance %</strong>, updates user time logs, and reflects in the employee's <strong className="text-slate-700">FTE / Utilization metrics</strong>. Full audit logs are automatically recorded for organizational transparency.
+            {currentUser.role === 'TASK_USER'
+              ? "Every time correction saved in this module immediately updates your target task's Actual Hours, recalculates Variance & Variance %, and updates your time logs. Full audit logs are automatically recorded for organizational transparency."
+              : "Every time correction saved in this module immediately updates the target task's Actual Hours, recalculates Variance & Variance %, updates user time logs, and reflects in the employee's FTE / Utilization metrics. Full audit logs are automatically recorded for organizational transparency."}
           </p>
         </div>
       </div>
@@ -841,7 +784,11 @@ export const TimeCorrectionPage: React.FC<TimeCorrectionPageProps> = ({
           }
         }}
         title="Remove Time Log Entry"
-        message={`Are you sure you want to remove this time entry (${sessionToDelete?.duration}h)? The task's actual hours and FTE utilization will be automatically adjusted.`}
+        message={`Are you sure you want to remove this time entry (${sessionToDelete?.duration}h)? ${
+          currentUser.role === 'TASK_USER'
+            ? "The task's actual hours will be automatically adjusted."
+            : "The task's actual hours and FTE utilization will be automatically adjusted."
+        }`}
         confirmText="Remove Entry"
         requireReason={true}
         variant="danger"

@@ -11,7 +11,6 @@ import {
   Trash2,
   AlertTriangle,
   FileSpreadsheet,
-  FileText,
   Calendar,
   Layers,
   ChevronDown,
@@ -25,7 +24,7 @@ import {
   getDaysOverdue,
   formatHours,
 } from '../../utils/calculations';
-import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
+import { exportToExcel } from '../../utils/exportUtils';
 import { ConfirmModal } from '../common/ConfirmModal';
 
 interface TaskManagementPageProps {
@@ -224,60 +223,6 @@ export const TaskManagementPage: React.FC<TaskManagementPageProps> = ({
     );
   };
 
-  const handleExportPDF = () => {
-    const columns = [
-      { header: 'ID', dataKey: 'id' },
-      { header: 'Task Name', dataKey: 'taskName' },
-      { header: 'Employee', dataKey: 'employee' },
-      { header: 'Dept', dataKey: 'department' },
-      { header: 'Start', dataKey: 'startDate' },
-      { header: 'End', dataKey: 'endDate' },
-      { header: 'Act(h)', dataKey: 'actualHours' },
-      { header: 'Var(h)', dataKey: 'variance' },
-      { header: 'Status', dataKey: 'status' },
-    ];
-
-    const exportData = sortedTasks.map(t => {
-      const u = users.find(usr => usr.id === t.assignedUserId);
-      const d = departments.find(dept => dept.id === t.departmentId);
-      return {
-        id: t.id,
-        taskName: t.taskName,
-        employee: u?.name || t.assignedUserId,
-        department: d?.code || t.departmentId,
-        startDate: t.startDate,
-        endDate: t.endDate || '—',
-        actualHours: t.actualHours,
-        variance: t.variance > 0 ? `+${t.variance}` : t.variance,
-        status: t.status,
-      };
-    });
-
-    exportToPDF(
-      {
-        reportName: isTaskUser ? 'My Task List & Effort Tracking' : 'Task Master List & Effort Tracking',
-        generatedDate: new Date().toLocaleString(),
-        generatedBy: `${currentUser.name} (${currentUser.role})`,
-        filtersApplied: isTaskUser
-          ? {
-              Scope: 'My Assigned Tasks',
-              Status: selectedStatus || 'All',
-            }
-          : {
-              Department: departments.find(d => d.id === selectedDept)?.name || 'All',
-              Status: selectedStatus || 'All',
-            },
-        summaryKpis: {
-          'Total Tasks': sortedTasks.length,
-          'Total Actual': `${sortedTasks.reduce((sum, t) => sum + t.actualHours, 0).toFixed(1)}h`,
-        },
-      },
-      columns,
-      exportData,
-      isTaskUser ? 'My_Task_List_Report' : 'Task_Management_Report'
-    );
-  };
-
   return (
     <div className="space-y-5">
       {/* Delete Single Task Confirmation Modal */}
@@ -351,12 +296,6 @@ export const TaskManagementPage: React.FC<TaskManagementPageProps> = ({
             className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-xl border border-slate-200 shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Export Excel
-          </button>
-          <button
-            onClick={handleExportPDF}
-            className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-xl border border-slate-200 shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <FileText className="w-4 h-4 text-rose-600" /> Export PDF
           </button>
           <button
             onClick={onOpenNewTask}

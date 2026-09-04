@@ -131,18 +131,18 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  USERS: 'fte_users_v4',
-  DEPARTMENTS: 'fte_departments_v4',
-  TASKS: 'fte_tasks_v4',
-  TIME_SESSIONS: 'fte_time_sessions_v4',
-  SCHEDULES: 'fte_schedules_v4',
-  HOLIDAYS: 'fte_holidays_v4',
-  CATEGORIES: 'fte_categories_v4',
-  THRESHOLDS: 'fte_thresholds_v4',
-  AUDIT_LOGS: 'fte_audit_logs_v4',
-  CURRENT_USER_ID: 'fte_current_user_id_v4',
-  ACTIVE_TIMER: 'fte_active_timer_v4',
-  IS_AUTHENTICATED: 'fte_is_authenticated_v4',
+  USERS: 'fte_users_v6',
+  DEPARTMENTS: 'fte_departments_v6',
+  TASKS: 'fte_tasks_v6',
+  TIME_SESSIONS: 'fte_time_sessions_v6',
+  SCHEDULES: 'fte_schedules_v6',
+  HOLIDAYS: 'fte_holidays_v6',
+  CATEGORIES: 'fte_categories_v6',
+  THRESHOLDS: 'fte_thresholds_v7',
+  AUDIT_LOGS: 'fte_audit_logs_v6',
+  CURRENT_USER_ID: 'fte_current_user_id_v7',
+  ACTIVE_TIMER: 'fte_active_timer_v6',
+  IS_AUTHENTICATED: 'fte_is_authenticated_v6',
 };
 
 function loadStorage<T>(key: string, fallback: T): T {
@@ -175,7 +175,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [workloadThresholds, setWorkloadThresholds] = useState<WorkloadThresholds>(() => loadStorage(STORAGE_KEYS.THRESHOLDS, initialWorkloadThresholds));
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => loadStorage(STORAGE_KEYS.AUDIT_LOGS, initialAuditLogs));
   
-  // Current user selection (Default to Administrator Sarah Chen for quick comprehensive testing)
+  // Current user selection (Default to Administrator Sarah Chen)
   const [currentUserId, setCurrentUserId] = useState<string>(() => loadStorage(STORAGE_KEYS.CURRENT_USER_ID, 'USR-001'));
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => loadStorage(STORAGE_KEYS.IS_AUTHENTICATED, true));
   

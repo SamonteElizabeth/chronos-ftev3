@@ -26,8 +26,9 @@ import {
   Maximize2,
   Minimize2,
 } from 'lucide-react';
-import { User as UserType, Task, TimeSession, Department, WorkingSchedule } from '../../types';
+import { User as UserType, Task, TimeSession, Department, WorkingSchedule, CapacityStatus } from '../../types';
 import { exportToExcel } from '../../utils/exportUtils';
+import { isOverCapacity, isAtCapacity, isUnderCapacity } from '../../utils/calculations';
 
 export interface DailyTaskBreakdown {
   taskId: string;
@@ -63,7 +64,7 @@ export interface EmployeeMetricItem {
   actualHours: number;
   capacityVariance: number;
   fte: number;
-  status: 'UNDER CAPACITY' | 'NEAR CAPACITY' | 'OVER CAPACITY';
+  status: CapacityStatus | string;
 }
 
 interface EmployeeFteDetailsModalProps {
@@ -419,14 +420,23 @@ export const EmployeeFteDetailsModal: React.FC<EmployeeFteDetailsModalProps> = (
                   {user.employeeId}
                 </span>
                 <span
-                  className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                    status === 'OVER CAPACITY'
-                      ? 'bg-rose-100 text-rose-800'
-                      : status === 'NEAR CAPACITY'
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : 'bg-blue-100 text-blue-800'
+                  className={`px-2.5 py-0.5 rounded-full text-xs font-bold inline-flex items-center gap-1.5 ${
+                    isOverCapacity(status)
+                      ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                      : isAtCapacity(status)
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                      : 'bg-blue-100 text-blue-800 border border-blue-200'
                   }`}
                 >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      isOverCapacity(status)
+                        ? 'bg-rose-500'
+                        : isAtCapacity(status)
+                        ? 'bg-emerald-500'
+                        : 'bg-blue-500'
+                    }`}
+                  />
                   {status} ({fte}%)
                 </span>
               </div>
@@ -468,7 +478,7 @@ export const EmployeeFteDetailsModal: React.FC<EmployeeFteDetailsModalProps> = (
         </div>
 
         {/* Capacity & FTE Executive Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 p-4 bg-slate-50/80 border-b border-slate-100 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 p-4 bg-slate-50/80 border-b border-slate-100 text-xs">
           <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
             <span className="text-slate-500 text-[11px] block font-medium">Evaluation Period</span>
             <div className="font-bold text-slate-900 text-sm mt-0.5 capitalize">{periodLabel}</div>
@@ -502,22 +512,12 @@ export const EmployeeFteDetailsModal: React.FC<EmployeeFteDetailsModalProps> = (
           </div>
 
           <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
-            <span className="text-slate-500 text-[11px] block font-medium">Capacity Variance</span>
-            <div className={`font-bold text-sm mt-0.5 ${capacityVariance < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
-              {capacityVariance > 0 ? `+${capacityVariance}h` : `${capacityVariance}h`}
-            </div>
-            <span className="text-[10px] text-slate-400">
-              {capacityVariance >= 0 ? 'Surplus Capacity' : 'Deficit / Overtime'}
-            </span>
-          </div>
-
-          <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
             <span className="text-slate-500 text-[11px] block font-medium">FTE Utilization</span>
-            <div className={`font-bold text-sm mt-0.5 ${fte > 100 ? 'text-rose-600' : fte >= 80 ? 'text-emerald-700' : 'text-blue-600'}`}>
+            <div className={`font-bold text-sm mt-0.5 ${fte > 100 ? 'text-rose-600' : fte === 100 ? 'text-emerald-700' : 'text-blue-600'}`}>
               {fte}%
             </div>
             <span className="text-[10px] text-slate-400">
-              Target: 100% (Actual / Avail)
+              {fte > 100 ? 'Over (>100%)' : fte === 100 ? 'At Cap (=100%)' : 'Under (<100%)'}
             </span>
           </div>
         </div>

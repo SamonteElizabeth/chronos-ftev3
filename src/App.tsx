@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar, TabType, MaintenanceSubTab } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
@@ -26,6 +26,13 @@ const MainLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [maintenanceSubTab, setMaintenanceSubTab] = useState<MaintenanceSubTab>('task-names');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  // If currentUser is a TASK_USER and activeTab is 'fte', reset to dashboard
+  useEffect(() => {
+    if (currentUser.role === 'TASK_USER' && activeTab === 'fte') {
+      setActiveTab('dashboard');
+    }
+  }, [currentUser.role, activeTab]);
 
   // Dashboard sub-view toggle (Personal Workspace vs Executive/Manager View)
   const [dashboardViewMode, setDashboardViewMode] = useState<'employee' | 'manager'>(
@@ -56,6 +63,10 @@ const MainLayout: React.FC = () => {
   };
 
   const handleSetActiveTab = (tab: TabType, subTab?: MaintenanceSubTab) => {
+    if (currentUser.role === 'TASK_USER' && tab === 'fte') {
+      setActiveTab('dashboard');
+      return;
+    }
     setActiveTab(tab);
     if (subTab) {
       setMaintenanceSubTab(subTab);
@@ -209,8 +220,8 @@ const MainLayout: React.FC = () => {
             />
           )}
 
-          {/* FTE & Capacity Tab */}
-          {activeTab === 'fte' && <FteCapacityPage />}
+          {/* FTE & Capacity Tab (Admin & Managers only) */}
+          {activeTab === 'fte' && currentUser.role !== 'TASK_USER' && <FteCapacityPage />}
 
           {/* User Management Tab (Admin) */}
           {activeTab === 'users' && <UserManagementPage />}

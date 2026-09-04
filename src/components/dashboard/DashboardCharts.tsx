@@ -216,9 +216,9 @@ export const EmployeeFteBarChart: React.FC<EmployeeFteChartProps> = ({ data }) =
               <Cell
                 key={`cell-${index}`}
                 fill={
-                  entry.status === 'OVER CAPACITY'
+                  entry.status === 'OVER CAPACITY' || entry.status === 'Over Capacity'
                     ? '#ef4444'
-                    : entry.status === 'NEAR CAPACITY'
+                    : entry.status === 'AT CAPACITY' || entry.status === 'At Capacity' || entry.status === 'NEAR CAPACITY'
                     ? '#10b981'
                     : '#3b82f6'
                 }
@@ -332,16 +332,18 @@ export const ProjectVarianceChart = EffortVarianceChart;
 // 6. Workload Distribution Donut
 interface WorkloadPieProps {
   under: number;
-  near: number;
+  atCapacity?: number;
+  near?: number;
   over: number;
 }
 
-export const WorkloadDistributionDonut: React.FC<WorkloadPieProps> = ({ under, near, over }) => {
-  const total = under + near + over;
+export const WorkloadDistributionDonut: React.FC<WorkloadPieProps> = ({ under, atCapacity, near, over }) => {
+  const atCap = atCapacity !== undefined ? atCapacity : (near || 0);
+  const total = under + atCap + over;
   const data = [
-    { name: 'Under Capacity', value: under, color: '#3b82f6' },
-    { name: 'Near Capacity', value: near, color: '#10b981' },
-    { name: 'Over Capacity', value: over, color: '#ef4444' },
+    { name: 'Under Capacity (< 100%)', value: under, color: '#3b82f6' },
+    { name: 'At Capacity (= 100%)', value: atCap, color: '#10b981' },
+    { name: 'Over Capacity (> 100%)', value: over, color: '#ef4444' },
   ].filter(d => d.value > 0);
 
   if (total === 0 || data.length === 0) {
@@ -384,21 +386,21 @@ export const WorkloadDistributionDonut: React.FC<WorkloadPieProps> = ({ under, n
         <div className="flex items-center justify-between text-slate-700">
           <span className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
-            <span>Under Cap</span>
+            <span>Under (&lt; 100%)</span>
           </span>
           <span className="font-semibold text-slate-900 font-mono">{under}</span>
         </div>
         <div className="flex items-center justify-between text-slate-700">
           <span className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-            <span>Near Cap</span>
+            <span>At Cap (= 100%)</span>
           </span>
-          <span className="font-semibold text-slate-900 font-mono">{near}</span>
+          <span className="font-semibold text-slate-900 font-mono">{atCap}</span>
         </div>
         <div className="flex items-center justify-between text-slate-700">
           <span className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
-            <span>Over Cap</span>
+            <span>Over (&gt; 100%)</span>
           </span>
           <span className="font-semibold text-slate-900 font-mono">{over}</span>
         </div>

@@ -7,7 +7,6 @@ import {
   Building,
   Settings,
   FileSpreadsheet,
-  FileText,
   AlertTriangle,
   CheckCircle,
   TrendingUp,
@@ -23,8 +22,11 @@ import {
   calculateFTE,
   getDateRangeForPeriod,
   getWorkloadStatus,
+  isOverCapacity,
+  isAtCapacity,
+  isUnderCapacity,
 } from '../../utils/calculations';
-import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
+import { exportToExcel } from '../../utils/exportUtils';
 import { EmployeeFteDetailsModal, EmployeeMetricItem } from './EmployeeFteDetailsModal';
 
 export const FteCapacityPage: React.FC = () => {
@@ -51,6 +53,7 @@ export const FteCapacityPage: React.FC = () => {
   const [selectedDept, setSelectedDept] = useState(
     isDeptManager ? currentUser.departmentId : ''
   );
+  const [capacityFilter, setCapacityFilter] = useState<'ALL' | 'UNDER' | 'AT' | 'OVER'>('ALL');
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [selectedEmployeeForDetails, setSelectedEmployeeForDetails] = useState<EmployeeMetricItem | null>(null);
 
@@ -166,9 +169,23 @@ export const FteCapacityPage: React.FC = () => {
   const totalPlanned = employeeMetrics.reduce((sum, m) => sum + m.plannedHours, 0);
   const aggregateFte = calculateFTE(totalActual, totalAvailable);
 
-  const underCount = employeeMetrics.filter(m => m.status === 'UNDER CAPACITY').length;
-  const nearCount = employeeMetrics.filter(m => m.status === 'NEAR CAPACITY').length;
-  const overCount = employeeMetrics.filter(m => m.status === 'OVER CAPACITY').length;
+  const underCount = employeeMetrics.filter(m => isUnderCapacity(m.status)).length;
+  const atCapacityCount = employeeMetrics.filter(m => isAtCapacity(m.status)).length;
+  const overCount = employeeMetrics.filter(m => isOverCapacity(m.status)).length;
+
+  // Filtered metrics for ledger table
+  const displayedMetrics = useMemo(() => {
+    if (capacityFilter === 'UNDER') {
+      return employeeMetrics.filter(m => isUnderCapacity(m.status));
+    }
+    if (capacityFilter === 'AT') {
+      return employeeMetrics.filter(m => isAtCapacity(m.status));
+    }
+    if (capacityFilter === 'OVER') {
+      return employeeMetrics.filter(m => isOverCapacity(m.status));
+    }
+    return employeeMetrics;
+  }, [employeeMetrics, capacityFilter]);
 
   // Personal task breakdown for Task User
   const myTaskBreakdown = useMemo(() => {
@@ -253,56 +270,22 @@ export const FteCapacityPage: React.FC = () => {
     );
   };
 
-  const handleExportPDF = () => {
-    const reportTitle = isTaskUser
-      ? 'My Personal FTE Capacity & Utilization Report'
-      : 'FTE Capacity & Utilization Report';
-
-    const columns = [
-      { header: 'Employee', dataKey: 'name' },
-      { header: 'Dept', dataKey: 'dept' },
-      { header: 'Shift (h)', dataKey: 'shift' },
-      { header: 'Avail (h)', dataKey: 'avail' },
-      { header: 'Actual (h)', dataKey: 'actual' },
-      { header: 'FTE (%)', dataKey: 'fte' },
-      { header: 'Status', dataKey: 'status' },
-    ];
-
-    const exportData = employeeMetrics.map(m => ({
-      name: m.user.name,
-      dept: m.departmentName,
-      shift: `${m.shiftHours}h`,
-      avail: `${m.availableHours}h`,
-      actual: `${m.actualHours}h`,
-      fte: `${m.fte}%`,
-      status: m.status,
-    }));
-
-    exportToPDF(
-      {
-        reportName: reportTitle,
-        generatedDate: new Date().toLocaleString(),
-        generatedBy: `${currentUser.name} (${currentUser.role})`,
-        filtersApplied: {
-          DateRange: `${dateRange.startDate} to ${dateRange.endDate}`,
-          Department: isTaskUser
-            ? departments.find(d => d.id === currentUser.departmentId)?.name || 'Assigned'
-            : departments.find(d => d.id === selectedDept)?.name || 'All',
-        },
-        summaryKpis: {
-          'Target Subject': isTaskUser ? `${currentUser.name} (${currentUser.employeeId})` : `${employeeMetrics.length} Employees`,
-          'FTE Utilization': `${aggregateFte}%`,
-          'Total Hours Logged': `${totalActual.toFixed(1)}h`,
-        },
-      },
-      columns,
-      exportData,
-      isTaskUser ? 'My_FTE_Utilization_Report' : 'FTE_Utilization_Report'
-    );
-  };
-
   const userDepartment = departments.find(d => d.id === currentUser.departmentId);
   const primaryMetric = employeeMetrics[0];
+
+  if (isTaskUser) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center max-w-md mx-auto my-12 shadow-xs">
+        <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-200">
+          <AlertTriangle className="w-6 h-6" />
+        </div>
+        <h3 className="text-base font-bold text-slate-900 mb-1">Access Restricted</h3>
+        <p className="text-xs text-slate-500 leading-relaxed">
+          FTE & Capacity Utilization analytics are only accessible to Managers and Administrators.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -320,12 +303,6 @@ export const FteCapacityPage: React.FC = () => {
             className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-lg border border-slate-200 shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Export Excel
-          </button>
-          <button
-            onClick={handleExportPDF}
-            className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-lg border border-slate-200 shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <FileText className="w-4 h-4 text-rose-600" /> Export PDF
           </button>
           {currentUser.role === 'ADMIN' && (
             <button
@@ -445,7 +422,7 @@ export const FteCapacityPage: React.FC = () => {
       {/* KPI Summary Cards */}
       {isTaskUser ? (
         /* Task User Personal KPI Cards */
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {/* Work Days & Schedule */}
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
             <span className="text-xs text-slate-500 font-medium">Working Days</span>
@@ -492,26 +469,7 @@ export const FteCapacityPage: React.FC = () => {
             <span className="text-[10px] uppercase font-bold text-blue-100">My FTE Utilization</span>
             <div className="text-2xl font-bold mt-1 text-white">{aggregateFte}%</div>
             <span className="text-[10px] text-blue-200 font-medium">
-              {primaryMetric?.status || 'UNDER CAPACITY'}
-            </span>
-          </div>
-
-          {/* Capacity Variance */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-            <span className="text-xs text-slate-500 font-medium">Capacity Variance</span>
-            <div
-              className={`text-2xl font-bold mt-1 ${
-                (primaryMetric?.capacityVariance || 0) < 0
-                  ? 'text-rose-600'
-                  : 'text-emerald-600'
-              }`}
-            >
-              {(primaryMetric?.capacityVariance || 0) > 0
-                ? `+${primaryMetric?.capacityVariance}h`
-                : `${primaryMetric?.capacityVariance || 0}h`}
-            </div>
-            <span className="text-[10px] text-slate-400">
-              {(primaryMetric?.capacityVariance || 0) >= 0 ? 'Remaining capacity' : 'Over capacity'}
+              {primaryMetric?.status || 'Under Capacity'}
             </span>
           </div>
         </div>
@@ -549,17 +507,58 @@ export const FteCapacityPage: React.FC = () => {
           </div>
 
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
-            <span className="text-xs text-slate-500 font-medium">Workload Distribution</span>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-500 font-medium">Capacity Status</span>
+              {capacityFilter !== 'ALL' && (
+                <button
+                  type="button"
+                  onClick={() => setCapacityFilter('ALL')}
+                  className="text-[10px] text-blue-600 hover:underline font-semibold cursor-pointer"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
             <div className="grid grid-cols-3 gap-1 text-center text-[11px] mt-1">
-              <div className="p-1 bg-blue-50 text-blue-800 rounded">
-                <span className="font-bold block">{underCount}</span> Under
-              </div>
-              <div className="p-1 bg-emerald-50 text-emerald-800 rounded">
-                <span className="font-bold block">{nearCount}</span> Near
-              </div>
-              <div className="p-1 bg-rose-50 text-rose-800 rounded">
-                <span className="font-bold block">{overCount}</span> Over
-              </div>
+              <button
+                type="button"
+                onClick={() => setCapacityFilter(capacityFilter === 'UNDER' ? 'ALL' : 'UNDER')}
+                className={`p-1 rounded-lg border transition-all cursor-pointer ${
+                  capacityFilter === 'UNDER'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs font-bold'
+                    : 'bg-blue-50 text-blue-800 border-blue-200/70 hover:bg-blue-100'
+                }`}
+                title="Under Capacity (< 100% FTE)"
+              >
+                <span className="font-bold block text-xs">{underCount}</span>
+                <span className="text-[9px] block leading-tight">&lt; 100%</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCapacityFilter(capacityFilter === 'AT' ? 'ALL' : 'AT')}
+                className={`p-1 rounded-lg border transition-all cursor-pointer ${
+                  capacityFilter === 'AT'
+                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs font-bold'
+                    : 'bg-emerald-50 text-emerald-800 border-emerald-200/70 hover:bg-emerald-100'
+                }`}
+                title="At Capacity (= 100% FTE)"
+              >
+                <span className="font-bold block text-xs">{atCapacityCount}</span>
+                <span className="text-[9px] block leading-tight">= 100%</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCapacityFilter(capacityFilter === 'OVER' ? 'ALL' : 'OVER')}
+                className={`p-1 rounded-lg border transition-all cursor-pointer ${
+                  capacityFilter === 'OVER'
+                    ? 'bg-rose-600 text-white border-rose-600 shadow-xs font-bold'
+                    : 'bg-rose-50 text-rose-800 border-rose-200/70 hover:bg-rose-100'
+                }`}
+                title="Over Capacity (> 100% FTE)"
+              >
+                <span className="font-bold block text-xs">{overCount}</span>
+                <span className="text-[9px] block leading-tight">&gt; 100%</span>
+              </button>
             </div>
           </div>
         </div>
@@ -567,14 +566,40 @@ export const FteCapacityPage: React.FC = () => {
 
       {/* Detailed FTE Calculation Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
             <h3 className="text-base font-bold text-slate-900">
               {isTaskUser
                 ? 'My Capacity & FTE Utilization Ledger'
                 : 'Employee Capacity & FTE Utilization Ledger'}
             </h3>
+            <div className="flex items-center gap-2 mt-1 flex-wrap text-xs text-slate-500">
+              <span className="font-semibold text-slate-700">Capacity Status:</span>
+              <span className="inline-flex items-center gap-1 text-blue-700 font-medium bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Under Capacity (&lt; 100%)
+              </span>
+              <span className="inline-flex items-center gap-1 text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> At Capacity (= 100%)
+              </span>
+              <span className="inline-flex items-center gap-1 text-rose-700 font-medium bg-rose-50 px-2 py-0.5 rounded border border-rose-100">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Over Capacity (&gt; 100%)
+              </span>
+            </div>
           </div>
+          {capacityFilter !== 'ALL' && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-600">
+                Showing: <strong>{capacityFilter === 'UNDER' ? 'Under Capacity (<100%)' : capacityFilter === 'AT' ? 'At Capacity (=100%)' : 'Over Capacity (>100%)'}</strong> ({displayedMetrics.length} staff)
+              </span>
+              <button
+                type="button"
+                onClick={() => setCapacityFilter('ALL')}
+                className="text-xs text-blue-600 hover:text-blue-800 underline font-semibold cursor-pointer"
+              >
+                Reset
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="overflow-x-auto">
@@ -594,7 +619,7 @@ export const FteCapacityPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {employeeMetrics.map(item => {
+              {displayedMetrics.map(item => {
                 return (
                   <tr key={item.user.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3 px-4">
@@ -640,10 +665,10 @@ export const FteCapacityPage: React.FC = () => {
                     <td className="py-3 px-4 text-right font-mono font-bold">
                       <span
                         className={
-                          item.fte > workloadThresholds.overCapacity
-                            ? 'text-rose-600'
-                            : item.fte >= workloadThresholds.underCapacity
-                            ? 'text-emerald-700'
+                          item.fte > 100
+                            ? 'text-rose-600 font-bold'
+                            : item.fte === 100
+                            ? 'text-emerald-700 font-bold'
                             : 'text-blue-600'
                         }
                       >
@@ -652,14 +677,23 @@ export const FteCapacityPage: React.FC = () => {
                     </td>
                     <td className="py-3 px-4">
                       <span
-                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
-                          item.status === 'OVER CAPACITY'
-                            ? 'bg-rose-100 text-rose-800'
-                            : item.status === 'NEAR CAPACITY'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-blue-100 text-blue-800'
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold inline-flex items-center gap-1.5 ${
+                          isOverCapacity(item.status)
+                            ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                            : isAtCapacity(item.status)
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                            : 'bg-blue-100 text-blue-800 border border-blue-200'
                         }`}
                       >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            isOverCapacity(item.status)
+                              ? 'bg-rose-500'
+                              : isAtCapacity(item.status)
+                              ? 'bg-emerald-500'
+                              : 'bg-blue-500'
+                          }`}
+                        />
                         {item.status}
                       </span>
                     </td>
@@ -772,11 +806,27 @@ export const FteCapacityPage: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
           <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-md w-full p-6 text-slate-800 animate-in zoom-in-95">
             <h3 className="text-base font-bold text-slate-900 mb-1">
-              Configure Workload Thresholds
+              Configure Capacity Thresholds
             </h3>
             <p className="text-xs text-slate-500 mb-4">
-              Set custom percentage cutoffs for Under, Near, and Over Capacity classifications.
+              Current benchmark standard: <span className="font-semibold text-blue-700">Under (&lt; 100%)</span>, <span className="font-semibold text-emerald-700">At Capacity (= 100%)</span>, <span className="font-semibold text-rose-700">Over (&gt; 100%)</span>.
             </p>
+
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 mb-4 text-xs space-y-1">
+              <div className="font-semibold text-slate-800">Standard Rule Definitions:</div>
+              <div className="text-slate-600 flex justify-between">
+                <span>Under Capacity:</span>
+                <span className="font-mono font-semibold text-blue-700">&lt; 100% FTE</span>
+              </div>
+              <div className="text-slate-600 flex justify-between">
+                <span>At Capacity:</span>
+                <span className="font-mono font-semibold text-emerald-700">= 100% FTE</span>
+              </div>
+              <div className="text-slate-600 flex justify-between">
+                <span>Over Capacity:</span>
+                <span className="font-mono font-semibold text-rose-700">&gt; 100% FTE</span>
+              </div>
+            </div>
 
             <form onSubmit={handleSaveThresholds} className="space-y-4 text-xs">
               <div>
@@ -786,13 +836,13 @@ export const FteCapacityPage: React.FC = () => {
                 <input
                   type="number"
                   min="1"
-                  max="99"
+                  max="100"
                   value={tempUnder}
                   onChange={e => setTempUnder(Number(e.target.value))}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 font-mono"
                 />
                 <span className="text-[10px] text-slate-400">
-                  Employees below this percentage will be marked "UNDER CAPACITY".
+                  FTE values below this percentage will be flagged as "Under Capacity".
                 </span>
               </div>
 
@@ -802,31 +852,43 @@ export const FteCapacityPage: React.FC = () => {
                 </label>
                 <input
                   type="number"
-                  min="50"
-                  max="200"
+                  min="100"
+                  max="250"
                   value={tempOver}
                   onChange={e => setTempOver(Number(e.target.value))}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 font-mono"
                 />
                 <span className="text-[10px] text-slate-400">
-                  Employees above this percentage will be marked "OVER CAPACITY".
+                  FTE values above this percentage will be flagged as "Over Capacity".
                 </span>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2">
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setShowConfigModal(false)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
+                  onClick={() => {
+                    setTempUnder(100);
+                    setTempOver(100);
+                  }}
+                  className="text-xs text-blue-600 hover:text-blue-800 font-medium underline cursor-pointer"
                 >
-                  Cancel
+                  Reset to Standard (100%)
                 </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium cursor-pointer"
-                >
-                  Save Settings
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowConfigModal(false)}
+                    className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium cursor-pointer"
+                  >
+                    Save Settings
+                  </button>
+                </div>
               </div>
             </form>
           </div>

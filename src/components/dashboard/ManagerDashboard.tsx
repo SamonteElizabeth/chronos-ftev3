@@ -57,6 +57,9 @@ import {
   calculateFTE,
   getDateRangeForPeriod,
   getWorkloadStatus,
+  isOverCapacity,
+  isAtCapacity,
+  isUnderCapacity,
   formatHours,
 } from '../../utils/calculations';
 
@@ -409,11 +412,12 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
     }).sort((a, b) => b.ftePercent - a.ftePercent);
   }, [relevantUsers, filteredTasks, workingSchedules, dateRange, holidays, departments]);
 
-  // ================= 5. PLANNED VS ACTUAL HOURS BY DEPARTMENT =================
+  // ================= 5. SHIFT VS ACTUAL HOURS BY DEPARTMENT =================
   const plannedVsActualData = useMemo(() => {
     return departmentFteData.map(d => ({
       name: d.code,
       fullName: d.department,
+      Shift: d.plannedHours,
       Planned: d.plannedHours,
       Actual: d.actualHours,
       Variance: Number((d.actualHours - d.plannedHours).toFixed(1)),
@@ -849,17 +853,17 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
                 <div className="flex items-center justify-between mb-2">
                   <div>
                     <h3 className="text-sm font-bold text-slate-900">Team Member Utilization</h3>
-                    <p className="text-xs text-slate-500">Benchmark against optimal 80%–100% capacity band</p>
+                    <p className="text-xs text-slate-500">Benchmark: Under (&lt;100%), At Cap (=100%), Over (&gt;100%)</p>
                   </div>
-                  <div className="flex items-center gap-1.5 text-[10px]">
-                    <span className="flex items-center gap-1 text-slate-600">
-                      <span className="w-2 h-2 rounded-full bg-blue-500" /> &lt;80%
+                  <div className="flex items-center gap-2 text-[10px]">
+                    <span className="flex items-center gap-1 text-slate-600 font-medium">
+                      <span className="w-2 h-2 rounded-full bg-blue-500" /> &lt;100% Under
                     </span>
-                    <span className="flex items-center gap-1 text-slate-600">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" /> 80-100%
+                    <span className="flex items-center gap-1 text-slate-600 font-medium">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" /> =100% At Cap
                     </span>
-                    <span className="flex items-center gap-1 text-slate-600">
-                      <span className="w-2 h-2 rounded-full bg-rose-500" /> &gt;100%
+                    <span className="flex items-center gap-1 text-slate-600 font-medium">
+                      <span className="w-2 h-2 rounded-full bg-rose-500" /> &gt;100% Over
                     </span>
                   </div>
                 </div>
@@ -885,8 +889,10 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
                                 <p className="text-slate-300">Actual Logged: <strong>{data.actualHours}h</strong></p>
                                 <p className="text-slate-300">Available: <strong>{data.availableHours}h</strong></p>
                                 <div className="pt-1 mt-1 border-t border-slate-700 flex justify-between gap-3">
-                                  <span className="text-slate-400">FTE Status:</span>
-                                  <span className="font-bold text-emerald-400">{data.ftePercent}% ({data.status})</span>
+                                  <span className="text-slate-400">Capacity Status:</span>
+                                  <span className={`font-bold ${isOverCapacity(data.status) ? 'text-rose-400' : isAtCapacity(data.status) ? 'text-emerald-400' : 'text-blue-400'}`}>
+                                    {data.ftePercent}% ({data.status})
+                                  </span>
                                 </div>
                               </div>
                             );
@@ -894,16 +900,15 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
                           return null;
                         }}
                       />
-                      <ReferenceLine x={80} stroke="#10B981" strokeDasharray="3 3" label={{ value: '80%', fill: '#10B981', fontSize: 10 }} />
-                      <ReferenceLine x={100} stroke="#EF4444" strokeDasharray="3 3" label={{ value: '100%', fill: '#EF4444', fontSize: 10 }} />
+                      <ReferenceLine x={100} stroke="#10B981" strokeDasharray="3 3" label={{ value: '100% Target', fill: '#059669', fontSize: 10, position: 'top' }} />
                       <Bar dataKey="ftePercent" name="FTE Utilization %" radius={[0, 4, 4, 0]}>
                         {employeeUtilizationData.map((entry, index) => (
                           <Cell
                             key={`cell-${index}`}
                             fill={
-                              entry.status === 'OVER CAPACITY'
+                              isOverCapacity(entry.status)
                                 ? '#EF4444'
-                                : entry.status === 'NEAR CAPACITY'
+                                : isAtCapacity(entry.status)
                                 ? '#10B981'
                                 : '#3B82F6'
                             }
@@ -973,12 +978,12 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
               </div>
             </div>
 
-            {/* Planned vs Actual Hours (Effort Budget Variance) */}
+            {/* Shift vs Actual Hours (Effort Variance) */}
             <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
               <div className="flex items-center justify-between mb-2">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">Planned Budget vs Actual Logged</h3>
-                  <p className="text-xs text-slate-500">Effort budget variance by department</p>
+                  <h3 className="text-sm font-bold text-slate-900">Shift Hours vs Actual Hours</h3>
+                  <p className="text-xs text-slate-500">Shift hours vs actual hours variance by department</p>
                 </div>
                 <span className="text-xs text-slate-500 font-medium">
                   Net Variance:{' '}
@@ -1002,8 +1007,8 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
                           return (
                             <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl text-xs border border-slate-700 space-y-1">
                               <p className="font-bold text-sm text-blue-300">{data.fullName}</p>
-                              <p className="text-slate-300">Planned: <strong>{data.Planned}h</strong></p>
-                              <p className="text-slate-300">Actual: <strong>{data.Actual}h</strong></p>
+                              <p className="text-slate-300">Shift Hours: <strong>{data.Shift ?? data.Planned}h</strong></p>
+                              <p className="text-slate-300">Actual Hours: <strong>{data.Actual}h</strong></p>
                               <p className={`pt-1 border-t border-slate-700 font-bold ${isOver ? 'text-rose-400' : 'text-emerald-400'}`}>
                                 Variance: {isOver ? '+' : ''}{data.Variance}h
                               </p>
@@ -1014,7 +1019,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
                       }}
                     />
                     <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
-                    <Bar dataKey="Planned" name="Planned Hours" fill="#94A3B8" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Shift" name="Shift Hours" fill="#94A3B8" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="Actual" name="Actual Hours" fill="#2563EB" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -1390,7 +1395,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
 
               <div className="mt-3 pt-2 text-[11px] text-slate-500 flex justify-between">
                 <span>Click any task to inspect details</span>
-                <span>Positive = budget overrun</span>
+                <span>Positive = shift hours exceeded</span>
               </div>
             </div>
 

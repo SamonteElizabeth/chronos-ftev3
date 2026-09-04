@@ -5,12 +5,11 @@ import {
   Search,
   Filter,
   FileSpreadsheet,
-  FileText,
   Clock,
   User,
   ShieldAlert,
 } from 'lucide-react';
-import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
+import { exportToExcel } from '../../utils/exportUtils';
 
 export const AuditTrailPage: React.FC = () => {
   const { auditLogs, currentUser } = useApp();
@@ -66,43 +65,6 @@ export const AuditTrailPage: React.FC = () => {
     );
   };
 
-  const handleExportPDF = () => {
-    const cols = [
-      { header: 'ID', dataKey: 'id' },
-      { header: 'Timestamp', dataKey: 'timestamp' },
-      { header: 'Action', dataKey: 'action' },
-      { header: 'Entity', dataKey: 'entity' },
-      { header: 'User', dataKey: 'user' },
-      { header: 'Details / Reason', dataKey: 'details' },
-    ];
-
-    const data = filteredLogs.map(l => ({
-      id: l.id,
-      timestamp: new Date(l.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      action: l.action,
-      entity: `${l.entityType}: ${l.entityId}`,
-      user: l.performedByName,
-      details: l.reason ? `[REASON: ${l.reason}] ${l.details}` : l.details,
-    }));
-
-    exportToPDF(
-      {
-        reportName: 'System Audit Trail & Compliance Ledger',
-        generatedDate: new Date().toLocaleString(),
-        generatedBy: `${currentUser.name} (${currentUser.role})`,
-        filtersApplied: {
-          Action: selectedAction || 'All',
-        },
-        summaryKpis: {
-          'Total Logged Events': filteredLogs.length,
-        },
-      },
-      cols,
-      data,
-      'System_Audit_Trail'
-    );
-  };
-
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -119,12 +81,6 @@ export const AuditTrailPage: React.FC = () => {
             className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-lg border border-slate-200 shadow-xs flex items-center gap-1.5 transition-colors"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Export Excel
-          </button>
-          <button
-            onClick={handleExportPDF}
-            className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-lg border border-slate-200 shadow-xs flex items-center gap-1.5 transition-colors"
-          >
-            <FileText className="w-4 h-4 text-rose-600" /> Export PDF
           </button>
         </div>
       </div>

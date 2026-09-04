@@ -5,6 +5,7 @@ import {
   Holiday,
   User,
   WorkloadThresholds,
+  CapacityStatus,
 } from '../types';
 
 /**
@@ -191,19 +192,53 @@ export function calculateFTE(actualHours: number, availableHours: number): numbe
 }
 
 /**
- * Evaluates employee workload status against thresholds
+ * Evaluates employee workload status against FTE thresholds:
+ * Status          FTE
+ * Under Capacity  < 100%
+ * At Capacity     = 100%
+ * Over Capacity   > 100%
  */
 export function getWorkloadStatus(
   utilizationPercent: number,
-  thresholds: WorkloadThresholds = { underCapacity: 80, overCapacity: 100 }
-): 'UNDER CAPACITY' | 'NEAR CAPACITY' | 'OVER CAPACITY' {
-  if (utilizationPercent < thresholds.underCapacity) {
-    return 'UNDER CAPACITY';
-  } else if (utilizationPercent <= thresholds.overCapacity) {
-    return 'NEAR CAPACITY';
-  } else {
-    return 'OVER CAPACITY';
+  thresholds: WorkloadThresholds = { underCapacity: 100, overCapacity: 100 }
+): CapacityStatus {
+  const underCutoff = thresholds?.underCapacity ?? 100;
+  const overCutoff = thresholds?.overCapacity ?? 100;
+
+  // When standard 100% benchmarks apply:
+  if (underCutoff === 100 && overCutoff === 100) {
+    if (utilizationPercent < 99.95) {
+      return 'Under Capacity';
+    } else if (utilizationPercent <= 100.05) {
+      return 'At Capacity';
+    } else {
+      return 'Over Capacity';
+    }
   }
+
+  // If custom administrator threshold overrides are active:
+  if (utilizationPercent < underCutoff) {
+    return 'Under Capacity';
+  } else if (utilizationPercent > overCutoff) {
+    return 'Over Capacity';
+  } else {
+    return 'At Capacity';
+  }
+}
+
+export function isOverCapacity(status: string): boolean {
+  const s = status.toLowerCase();
+  return s.includes('over');
+}
+
+export function isAtCapacity(status: string): boolean {
+  const s = status.toLowerCase();
+  return s.includes('at') || s.includes('near');
+}
+
+export function isUnderCapacity(status: string): boolean {
+  const s = status.toLowerCase();
+  return s.includes('under');
 }
 
 /**
