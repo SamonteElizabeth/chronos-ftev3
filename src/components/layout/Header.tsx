@@ -69,8 +69,6 @@ export const Header: React.FC<HeaderProps> = ({
           <Menu className="w-5 h-5" />
         </button>
         <div className="flex items-center gap-2">
-          <span className="text-slate-400 text-xs sm:text-sm font-medium">Workspace</span>
-          <span className="text-slate-300 text-sm">/</span>
           <span className="text-slate-800 text-xs sm:text-sm font-semibold capitalize">
             {activeTabTitle}
           </span>

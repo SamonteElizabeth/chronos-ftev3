@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Task, GlobalFilterState } from '../../types';
+import { exportToExcel, ExportMetadata } from '../../utils/exportUtils';
 import {
   Filter,
   Users,
@@ -31,6 +32,8 @@ import {
   UserCheck,
   Settings,
   ChevronDown,
+  FileSpreadsheet,
+  Download,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -116,6 +119,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
     workingSchedules,
     holidays,
     categoryConfig,
+    showToast,
   } = useApp();
 
   // Active section tab
@@ -548,6 +552,117 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
     return { under, atCap, over, total: employeeUtilizationData.length };
   }, [employeeUtilizationData]);
 
+  // Export Dashboard to Excel handler
+  const handleExportExcel = () => {
+    const activeDeptName = isDeptManager
+      ? departments.find(d => d.id === currentUser.departmentId)?.name || 'Assigned Department'
+      : filters.departmentId
+      ? departments.find(d => d.id === filters.departmentId)?.name || 'All Departments'
+      : 'All Departments';
+
+    const activeUserName = filters.userId
+      ? users.find(u => u.id === filters.userId)?.name || 'All Members'
+      : 'All Members';
+
+    const metadata: ExportMetadata = {
+      reportName: isDeptManager
+        ? `${activeDeptName} Department Executive Dashboard Export`
+        : 'Executive Dashboard Export',
+      generatedDate: new Date().toLocaleString(),
+      generatedBy: `${currentUser.name} (${currentUser.role})`,
+      filtersApplied: {
+        'Date Range': `${filters.dateFrom} to ${filters.dateTo} (${datePreset === 'all' ? 'All 2026' : datePreset})`,
+        'Department Scope': activeDeptName,
+        'Team Member': activeUserName,
+        'Work Type': filters.requestType || 'All Work Types',
+        'Priority': filters.priority || 'All Priorities',
+        'Status': filters.status || 'All Statuses',
+        'Search Filter': filters.searchQuery || 'None',
+      },
+      summaryKpis: {
+        'Total Filtered Tasks': totalTasks,
+        'Total Tracked Hours': `${totalActualHours.toFixed(1)} hrs`,
+        'Total Planned Shift Hours': `${totalPlannedHours.toFixed(1)} hrs`,
+        'Total Available Net Capacity': `${totalAvailableHours.toFixed(1)} hrs`,
+        'Capacity Hours Variance': `${(totalAvailableHours - totalActualHours).toFixed(1)} hrs`,
+        'FTE Utilization Rate': `${fteUtilizationPercent}%`,
+        'Avg Completion Rate': `${totalTasks > 0 ? ((completedTasks / totalTasks) * 100).toFixed(1) : '0.0'}%`,
+        'Overdue Tasks Count': overdueTasksCount,
+        'Active Team Size': employeeUtilizationData.length,
+        'Over Capacity Staff': employeeCapacityStats.over,
+        'At Capacity Staff': employeeCapacityStats.atCap,
+        'Under Capacity Staff': employeeCapacityStats.under,
+      },
+    };
+
+    // 1. Task Master List Dataset
+    const tasksData = filteredTasks.map(t => {
+      const assignee = users.find(u => u.id === t.assignedUserId);
+      const dept = departments.find(d => d.id === t.departmentId);
+      const shiftH = t.shiftHours || t.plannedHours || 0;
+      const actualH = t.actualHours || 0;
+      const variance = Number((shiftH - actualH).toFixed(1));
+      const isOverdue = t.status !== 'Completed' && t.status !== 'Cancelled' && t.endDate < '2026-08-26';
+
+      return {
+        'Task ID': t.id,
+        'Task Title': t.taskName,
+        'Department': dept?.name || 'N/A',
+        'Assigned Member': assignee?.name || 'Unassigned',
+        'Work / Task Type': t.taskType || t.requestType || 'General',
+        'Priority': t.priority,
+        'Status': t.status,
+        'Start Date': t.startDate || '—',
+        'Due Date': t.endDate || '—',
+        'Planned Shift (h)': shiftH,
+        'Actual Tracked (h)': actualH,
+        'Variance (h)': variance,
+        'Overdue': isOverdue ? 'YES' : 'NO',
+        'Description': t.description || '',
+      };
+    });
+
+    // 2. Staff Capacity & FTE Dataset
+    const capacityData = employeeUtilizationData.map(e => ({
+      'Employee ID': e.id,
+      'Employee Name': e.name,
+      'Title': e.title,
+      'Department': e.department,
+      'Active Tasks': e.taskCount,
+      'Available Net (h)': e.availableHours,
+      'Actual Tracked (h)': e.actualHours,
+      'Variance (h)': e.varianceHours,
+      'FTE Capacity (%)': `${e.ftePercentage}%`,
+      'Capacity Status': e.status,
+      'Overdue Tasks': e.overdueCount,
+    }));
+
+    // 3. Department Breakdown Dataset
+    const departmentData = departmentFteData.map(d => ({
+      'Department Code': d.code,
+      'Department Name': d.department,
+      'Active Staff Count': d.activeEmployees,
+      'Total Tasks': d.totalTasks,
+      'Planned Shift (h)': d.totalPlannedHours,
+      'Actual Tracked (h)': d.totalActualHours,
+      'Variance (h)': d.totalVarianceHours,
+      'Overdue Tasks': d.overdueTasksCount,
+      'Avg FTE %': `${d.avgFtePercentage}%`,
+    }));
+
+    exportToExcel(
+      metadata,
+      [
+        { sheetName: 'Tasks Master List', data: tasksData },
+        { sheetName: 'Staff Capacity & FTE', data: capacityData },
+        { sheetName: 'Department Breakdown', data: departmentData },
+      ],
+      isDeptManager ? `${activeDeptName.replace(/\s+/g, '_')}_Dashboard_Export` : 'Workforce_Dashboard_Export'
+    );
+
+    showToast('success', 'Excel Export Ready', 'Dashboard workbook has been downloaded successfully.');
+  };
+
   return (
     <div className="space-y-6 pb-12 font-sans">
       {/* ================= TOP HEADER & ROLE BADGE BANNER ================= */}
@@ -602,6 +717,16 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
               <span>Reset Filters</span>
             </button>
           )}
+
+          {/* Export to Excel Button */}
+          <button
+            onClick={handleExportExcel}
+            className="px-3.5 py-1.5 text-xs text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 font-semibold rounded-xl border border-emerald-200 shadow-xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+            title="Export filtered dashboard datasets and metrics to Excel (.xlsx)"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            <span>Export Excel</span>
+          </button>
         </div>
       </div>
 
@@ -619,9 +744,19 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
               </span>
             )}
           </div>
-          <span className="text-xs text-slate-400">
-            {filteredTasks.length} {filteredTasks.length === 1 ? 'task' : 'tasks'} matched
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-400">
+              {filteredTasks.length} {filteredTasks.length === 1 ? 'task' : 'tasks'} matched
+            </span>
+            <button
+              onClick={handleExportExcel}
+              className="px-2.5 py-1 text-xs text-slate-700 hover:text-emerald-700 bg-slate-50 hover:bg-emerald-50 font-medium rounded-lg border border-slate-200 hover:border-emerald-200 shadow-2xs flex items-center gap-1.5 cursor-pointer transition-colors"
+              title="Download Excel spreadsheet of matched dashboard data"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Export</span>
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 text-xs">

@@ -10,9 +10,29 @@ export interface ExportMetadata {
   summaryKpis?: Record<string, string | number>;
 }
 
+export interface ExcelSheetPayload {
+  sheetName: string;
+  data: Record<string, any>[];
+}
+
+function autoFitColumns(rows: Record<string, any>[]): { wch: number }[] {
+  if (!rows || rows.length === 0) return [];
+  const keys = Object.keys(rows[0]);
+  return keys.map(key => {
+    let maxLen = key.length;
+    const sample = rows.slice(0, 100);
+    sample.forEach(r => {
+      const val = r[key];
+      const str = val !== null && val !== undefined ? String(val) : '';
+      if (str.length > maxLen) maxLen = str.length;
+    });
+    return { wch: Math.min(Math.max(maxLen + 3, 11), 45) };
+  });
+}
+
 export function exportToExcel(
   metadata: ExportMetadata,
-  data: Record<string, any>[],
+  data: Record<string, any>[] | ExcelSheetPayload[],
   fileName?: string
 ) {
   const wb = XLSX.utils.book_new();
@@ -39,12 +59,28 @@ export function exportToExcel(
   }
 
   const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
+  wsSummary['!cols'] = [{ wch: 25 }, { wch: 45 }];
   XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
 
-  // Create the main data sheet
-  if (data.length > 0) {
-    const wsData = XLSX.utils.json_to_sheet(data);
-    XLSX.utils.book_append_sheet(wb, wsData, 'Report Data');
+  // Check if multiple sheets or single dataset
+  if (Array.isArray(data) && data.length > 0) {
+    const isMultiSheet = 'sheetName' in data[0] && Array.isArray((data[0] as ExcelSheetPayload).data);
+
+    if (isMultiSheet) {
+      (data as ExcelSheetPayload[]).forEach(sheetItem => {
+        if (sheetItem.data && sheetItem.data.length > 0) {
+          const ws = XLSX.utils.json_to_sheet(sheetItem.data);
+          ws['!cols'] = autoFitColumns(sheetItem.data);
+          const safeTitle = sheetItem.sheetName.substring(0, 31).replace(/[\\/?*\[\]]/g, '_');
+          XLSX.utils.book_append_sheet(wb, ws, safeTitle);
+        }
+      });
+    } else {
+      const records = data as Record<string, any>[];
+      const wsData = XLSX.utils.json_to_sheet(records);
+      wsData['!cols'] = autoFitColumns(records);
+      XLSX.utils.book_append_sheet(wb, wsData, 'Report Data');
+    }
   }
 
   const safeFileName = (fileName || metadata.reportName).replace(/[^a-zA-Z0-9_-]/g, '_');

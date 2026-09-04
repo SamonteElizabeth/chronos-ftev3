@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Task } from '../../types';
+import { exportToExcel, ExportMetadata } from '../../utils/exportUtils';
 import {
   CheckCircle2,
   Check,
@@ -18,6 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
   SlidersHorizontal,
+  FileSpreadsheet,
 } from 'lucide-react';
 import {
   isTaskOverdue,
@@ -35,12 +37,14 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({
 }) => {
   const {
     currentUser,
+    departments,
     tasks,
     timeSessions,
     activeTimer,
     timerElapsedSeconds,
     startTimer,
     stopTimer,
+    showToast,
   } = useApp();
 
   // Period & Date filters
@@ -270,13 +274,93 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({
     onlyOverdue ||
     selectedDate !== new Date().toISOString().split('T')[0];
 
+  // Export personal dashboard data to Excel
+  const handleExportExcel = () => {
+    const userDept = departments.find(d => d.id === currentUser.departmentId);
+    const metadata: ExportMetadata = {
+      reportName: 'Personal Desk & Time Tracking Dashboard Export',
+      generatedDate: new Date().toLocaleString(),
+      generatedBy: `${currentUser.name} (${currentUser.role})`,
+      filtersApplied: {
+        'Reporting Period': period.toUpperCase(),
+        'Date Boundary': dateRange ? `${dateRange.startDate} to ${dateRange.endDate}` : 'All Time',
+        'Department': userDept?.name || 'N/A',
+        'Status Filter': selectedStatus || 'All Statuses',
+        'Overdue Only': onlyOverdue ? 'Yes' : 'No',
+        'Search Keyword': search || 'None',
+      },
+      summaryKpis: {
+        'Total Assigned Tasks': totalTasks,
+        'In Progress Tasks': activeTasks,
+        'Completed Tasks': completedTasks,
+        'Overdue Tasks': overdueTasks,
+        'Planned Shift Hours': `${totalPlannedHours} hrs`,
+        'Actual Tracked Hours': `${totalActualHours.toFixed(1)} hrs`,
+      },
+    };
+
+    const taskData = filteredTasks.map(t => {
+      const shiftH = t.shiftHours || t.plannedHours || 0;
+      const actualH = t.actualHours || 0;
+      const overdue = isTaskOverdue(t);
+      return {
+        'Task ID': t.id,
+        'Task Title': t.taskName,
+        'Task Type': t.taskType || t.requestType || 'General',
+        'Priority': t.priority,
+        'Status': t.status,
+        'Start Date': t.startDate || '—',
+        'Due Date': t.endDate || '—',
+        'Planned Shift (h)': shiftH,
+        'Actual Tracked (h)': actualH,
+        'Variance (h)': Number((shiftH - actualH).toFixed(1)),
+        'Overdue': overdue ? 'YES' : 'NO',
+        'Description': t.description || '',
+      };
+    });
+
+    const sessionsData = filteredSessions.map(s => {
+      const task = tasks.find(t => t.id === s.taskId);
+      return {
+        'Session ID': s.id,
+        'Task ID': s.taskId,
+        'Task Name': task?.taskName || 'N/A',
+        'Date': s.startTime.split('T')[0],
+        'Start Time': new Date(s.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        'End Time': s.endTime ? new Date(s.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'In Progress',
+        'Duration (h)': s.durationHours,
+        'Type': s.correctionType || 'Standard Timer',
+        'Notes': s.notes || '',
+      };
+    });
+
+    exportToExcel(
+      metadata,
+      [
+        { sheetName: 'My Assigned Tasks', data: taskData },
+        { sheetName: 'Logged Time Sessions', data: sessionsData },
+      ],
+      `${currentUser.name.replace(/\s+/g, '_')}_Personal_Dashboard_Export`
+    );
+
+    showToast('success', 'Excel Export Ready', 'Personal dashboard data downloaded successfully.');
+  };
+
   return (
     <div className="space-y-6">
       {/* Welcome Banner */}
-      <div className="bg-white p-5 rounded-2xl text-slate-900 shadow-xs border border-slate-200/80">
+      <div className="bg-white p-5 rounded-2xl text-slate-900 shadow-xs border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h2 className="text-xl font-bold text-slate-900">
           Welcome back, {currentUser.name}
         </h2>
+        <button
+          onClick={handleExportExcel}
+          className="px-3.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200 shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto active:scale-95"
+          title="Export personal dashboard tasks and logged time to Excel"
+        >
+          <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+          <span>Export Excel</span>
+        </button>
       </div>
 
       {/* Filter and Date Period Controls Bar */}

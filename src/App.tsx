@@ -169,7 +169,7 @@ const MainLayout: React.FC = () => {
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      <Users className="w-3.5 h-3.5" /> Workforce / Management
+                      <Users className="w-3.5 h-3.5" /> Executive
                     </button>
                     <button
                       onClick={() => setDashboardViewMode('employee')}
