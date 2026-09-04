@@ -260,7 +260,7 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   <div className="text-left">
                     <p className="font-medium">Alex Rodriguez</p>
-                    <p className="text-[10px] text-slate-500">Department-level (DEP-002)</p>
+                    <p className="text-[10px] text-slate-500">Department-level (TSD)</p>
                   </div>
                   <span className="text-[9px] px-1.5 py-0.5 rounded font-bold bg-amber-100 text-amber-800 border border-amber-200">
                     DEPT MGR

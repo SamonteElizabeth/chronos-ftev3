@@ -165,11 +165,86 @@ function saveStorage<T>(key: string, value: T): void {
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // State Initialization with local storage fallback
-  const [users, setUsers] = useState<User[]>(() => loadStorage(STORAGE_KEYS.USERS, initialUsers));
-  const [departments, setDepartments] = useState<Department[]>(() => loadStorage(STORAGE_KEYS.DEPARTMENTS, initialDepartments));
+  const [users, setUsers] = useState<User[]>(() => {
+    const loaded = loadStorage(STORAGE_KEYS.USERS, initialUsers);
+    const titleUpdates: Record<string, string> = {
+      'USR-003': 'TSD Department Manager',
+      'USR-004': 'DISD Department Manager',
+      'USR-005': 'EEM Department Manager',
+      'USR-006': 'Senior SSIG Analyst',
+      'USR-007': 'Junior SSIG Analyst',
+      'USR-008': 'Senior TSD Full Stack Engineer',
+      'USR-009': 'TSD Frontend UI/UX Specialist',
+      'USR-010': 'DISD Support Specialist',
+      'USR-011': 'EEM Talent Partner',
+    };
+    return loaded.map((u: User) => {
+      if (titleUpdates[u.id] && (u.title.includes('Engineering') || u.title.includes('Client Support') || u.title.includes('HR') || u.title.includes('Business Analyst') || u.title.includes('Support Resolution') || u.title.includes('Senior Full Stack') || u.title.includes('Frontend UI/UX'))) {
+        return { ...u, title: titleUpdates[u.id] };
+      }
+      return u;
+    });
+  });
+  const [departments, setDepartments] = useState<Department[]>(() => {
+    const loaded = loadStorage(STORAGE_KEYS.DEPARTMENTS, initialDepartments);
+    const deptMap: Record<string, { name: string; code: string; desc: string }> = {
+      'DEP-001': {
+        name: 'SSIG',
+        code: 'SSIG',
+        desc: 'System Software Integration Group (SSIG) - architecture, process modeling, business analysis, and solution delivery.',
+      },
+      'DEP-002': {
+        name: 'TSD',
+        code: 'TSD',
+        desc: 'Technology Services Division (TSD) - software development, API infrastructure, systems integration, and quality assurance.',
+      },
+      'DEP-003': {
+        name: 'DISD',
+        code: 'DISD',
+        desc: 'Digital Information Systems Department (DISD) - system operations, client triage, SLA monitoring, and incident resolution.',
+      },
+      'DEP-004': {
+        name: 'EEM',
+        code: 'EEM',
+        desc: 'Enterprise & Equipment Management (EEM) - talent development, operational resources, compliance, and onboarding.',
+      },
+    };
+    return loaded.map((dept: Department) => {
+      if (deptMap[dept.id]) {
+        return {
+          ...dept,
+          name: deptMap[dept.id].name,
+          code: deptMap[dept.id].code,
+          description: deptMap[dept.id].desc,
+        };
+      }
+      return dept;
+    });
+  });
   const [tasks, setTasks] = useState<Task[]>(() => loadStorage(STORAGE_KEYS.TASKS, initialTasks));
   const [timeSessions, setTimeSessions] = useState<TimeSession[]>(() => loadStorage(STORAGE_KEYS.TIME_SESSIONS, initialTimeSessions));
-  const [workingSchedules, setWorkingSchedules] = useState<WorkingSchedule[]>(() => loadStorage(STORAGE_KEYS.SCHEDULES, initialWorkingSchedules));
+  const [workingSchedules, setWorkingSchedules] = useState<WorkingSchedule[]>(() => {
+    const loaded = loadStorage(STORAGE_KEYS.SCHEDULES, initialWorkingSchedules);
+    return loaded.map((sched: WorkingSchedule) => {
+      if (sched.hoursPerDay === 10 && (sched.breakHours === 2 || sched.netWorkHoursPerDay === 8 || !sched.netWorkHoursPerDay)) {
+        return {
+          ...sched,
+          hoursPerDay: 10,
+          netWorkHoursPerDay: 8.5,
+          breakHours: 1.5,
+          breakBreakdown: {
+            lunchBreakMinutes: 60,
+            lunchTimeRange: sched.breakBreakdown?.lunchTimeRange || '12:00 PM - 01:00 PM',
+            morningBreakMinutes: 15,
+            morningTimeRange: '10:00 AM - 10:15 AM',
+            afternoonBreakMinutes: 15,
+            afternoonTimeRange: '03:00 PM - 03:15 PM',
+          },
+        };
+      }
+      return sched;
+    });
+  });
   const [holidays, setHolidays] = useState<Holiday[]>(() => loadStorage(STORAGE_KEYS.HOLIDAYS, initialHolidays));
   const [categoryConfig, setCategoryConfig] = useState<TaskCategoryConfig>(() => loadStorage(STORAGE_KEYS.CATEGORIES, initialCategoryConfig));
   const [workloadThresholds, setWorkloadThresholds] = useState<WorkloadThresholds>(() => loadStorage(STORAGE_KEYS.THRESHOLDS, initialWorkloadThresholds));

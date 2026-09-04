@@ -490,8 +490,8 @@ export const EmployeeFteDetailsModal: React.FC<EmployeeFteDetailsModalProps> = (
           <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
             <span className="text-slate-500 text-[11px] block font-medium">Shift Hour</span>
             <div className="font-bold text-slate-900 text-sm mt-0.5">{shiftHours}h</div>
-            <span className="text-[10px] text-slate-400" title="10h daily shift · 2h breaks (1h lunch 12:00-1:00 PM, 30m morning, 30m afternoon)">
-              {workingDaysCount}d × {shiftHoursPerDay}h (2h break/day)
+            <span className="text-[10px] text-slate-400" title="10h daily shift · 1.5h breaks (1h lunch 12:00-1:00 PM, 15m morning, 15m afternoon)">
+              {workingDaysCount}d × {shiftHoursPerDay}h (1.5h break/day)
             </span>
           </div>
 
@@ -499,7 +499,7 @@ export const EmployeeFteDetailsModal: React.FC<EmployeeFteDetailsModalProps> = (
             <span className="text-slate-500 text-[11px] block font-medium">Available Capacity</span>
             <div className="font-bold text-slate-900 text-sm mt-0.5">{availableHours}h</div>
             <span className="text-[10px] text-slate-400">
-              8h net productive/day
+              {schedule.netWorkHoursPerDay || 8.5}h net productive/day
             </span>
           </div>
 
@@ -726,7 +726,7 @@ export const EmployeeFteDetailsModal: React.FC<EmployeeFteDetailsModalProps> = (
                     </span>
                   </div>
                   <span className="text-slate-600 text-[11px] block mt-0.5">
-                    Breakdown of tasks executed per date against daily scheduled shift target ({schedule.hoursPerDay || 10}h/day shift with 2h scheduled breaks: 1h lunch 12:00-1:00 PM, 30m AM, 30m PM → 8h net working time). Multiple distinct tasks executed on the same date are itemized below.
+                    Breakdown of tasks executed per date against daily scheduled shift target ({schedule.hoursPerDay || 10}h/day shift with 1.5h scheduled breaks: 1h lunch 12:00-1:00 PM, 15m AM, 15m PM → {schedule.netWorkHoursPerDay || 8.5}h net working time). Multiple distinct tasks executed on the same date are itemized below.
                   </span>
                 </div>
                 <div className="flex items-center gap-2 self-end sm:self-center">

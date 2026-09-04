@@ -192,18 +192,18 @@ export const WorkScheduleSettingsModal: React.FC<WorkScheduleSettingsModalProps>
       updateWorkingSchedule(userSchedule.id, {
         name: scheduleName,
         hoursPerDay: durationHours,
-        netWorkHoursPerDay: durationHours >= 2 ? durationHours - 2 : durationHours,
+        netWorkHoursPerDay: durationHours >= 1.5 ? durationHours - 1.5 : durationHours,
         workingDays: newWorkingDays,
         startTime: startTime24,
         endTime: endTime24,
-        breakHours: 2,
+        breakHours: 1.5,
         breakBreakdown: {
           lunchBreakMinutes: 60,
           lunchTimeRange: '12:00 PM - 01:00 PM',
-          morningBreakMinutes: 30,
-          morningTimeRange: '10:00 AM - 10:30 AM',
-          afternoonBreakMinutes: 30,
-          afternoonTimeRange: '03:00 PM - 03:30 PM',
+          morningBreakMinutes: 15,
+          morningTimeRange: '10:00 AM - 10:15 AM',
+          afternoonBreakMinutes: 15,
+          afternoonTimeRange: '03:00 PM - 03:15 PM',
         },
       });
     } else {
@@ -211,18 +211,18 @@ export const WorkScheduleSettingsModal: React.FC<WorkScheduleSettingsModalProps>
       createWorkingSchedule({
         name: scheduleName,
         hoursPerDay: durationHours,
-        netWorkHoursPerDay: durationHours >= 2 ? durationHours - 2 : durationHours,
+        netWorkHoursPerDay: durationHours >= 1.5 ? durationHours - 1.5 : durationHours,
         workingDays: newWorkingDays,
         startTime: startTime24,
         endTime: endTime24,
-        breakHours: 2,
+        breakHours: 1.5,
         breakBreakdown: {
           lunchBreakMinutes: 60,
           lunchTimeRange: '12:00 PM - 01:00 PM',
-          morningBreakMinutes: 30,
-          morningTimeRange: '10:00 AM - 10:30 AM',
-          afternoonBreakMinutes: 30,
-          afternoonTimeRange: '03:00 PM - 03:30 PM',
+          morningBreakMinutes: 15,
+          morningTimeRange: '10:00 AM - 10:15 AM',
+          afternoonBreakMinutes: 15,
+          afternoonTimeRange: '03:00 PM - 03:15 PM',
         },
       });
       updateUser(user.id, {
@@ -233,7 +233,7 @@ export const WorkScheduleSettingsModal: React.FC<WorkScheduleSettingsModalProps>
     showToast(
       'success',
       'Work Schedule Updated',
-      `Work schedule set to ${startTimeDisplay} - ${endTimeDisplay} (${durationHours} hours shift with 2h scheduled breaks).`
+      `Work schedule set to ${startTimeDisplay} - ${endTimeDisplay} (${durationHours} hours shift with 1.5h scheduled breaks: 1h lunch, 15m morning, 15m afternoon).`
     );
     onClose();
   };
@@ -338,12 +338,12 @@ export const WorkScheduleSettingsModal: React.FC<WorkScheduleSettingsModalProps>
             <div className="pt-2 border-t border-slate-200/60 text-[11px] space-y-1.5">
               <div className="flex items-center justify-between text-slate-600 font-medium">
                 <span>Scheduled Breaks:</span>
-                <span className="font-bold text-slate-800 font-mono">2.0 hours total</span>
+                <span className="font-bold text-slate-800 font-mono">1.5 hours total</span>
               </div>
               <div className="grid grid-cols-3 gap-1.5 text-[10px]">
                 <div className="bg-white p-1.5 rounded-md border border-slate-200/70 text-center">
                   <span className="text-slate-500 block">Morning</span>
-                  <span className="font-semibold text-slate-700">30 mins</span>
+                  <span className="font-semibold text-slate-700">15 mins</span>
                 </div>
                 <div className="bg-blue-50/70 p-1.5 rounded-md border border-blue-200/60 text-center">
                   <span className="text-blue-700 font-semibold block">Lunch (12-1 PM)</span>
@@ -351,13 +351,13 @@ export const WorkScheduleSettingsModal: React.FC<WorkScheduleSettingsModalProps>
                 </div>
                 <div className="bg-white p-1.5 rounded-md border border-slate-200/70 text-center">
                   <span className="text-slate-500 block">Afternoon</span>
-                  <span className="font-semibold text-slate-700">30 mins</span>
+                  <span className="font-semibold text-slate-700">15 mins</span>
                 </div>
               </div>
               <div className="flex items-center justify-between text-[11px] text-emerald-700 font-semibold pt-1">
                 <span>Net Productive Work Time:</span>
                 <span className="font-mono font-bold">
-                  {Math.max(0, durationHours - 2).toFixed(1)} hours/day
+                  {Math.max(0, durationHours - 1.5).toFixed(1)} hours/day
                 </span>
               </div>
             </div>

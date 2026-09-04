@@ -675,7 +675,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
               <option value="">All Departments</option>
               {departments.map(d => (
                 <option key={d.id} value={d.id}>
-                  {d.name} ({d.code})
+                  {d.name === d.code ? d.name : `${d.name} (${d.code})`}
                 </option>
               ))}
             </select>

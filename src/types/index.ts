@@ -118,21 +118,21 @@ export interface ActiveTimer {
 export interface BreakScheduleBreakdown {
   lunchBreakMinutes: number; // 60 mins (12:00 PM to 1:00 PM)
   lunchTimeRange?: string; // "12:00 PM - 01:00 PM"
-  morningBreakMinutes: number; // 30 mins
-  morningTimeRange?: string; // "10:00 AM - 10:30 AM"
-  afternoonBreakMinutes: number; // 30 mins
-  afternoonTimeRange?: string; // "03:00 PM - 03:30 PM"
+  morningBreakMinutes: number; // 15 mins
+  morningTimeRange?: string; // "10:00 AM - 10:15 AM"
+  afternoonBreakMinutes: number; // 15 mins
+  afternoonTimeRange?: string; // "03:00 PM - 03:15 PM"
 }
 
 export interface WorkingSchedule {
   id: string;
   name: string;
   hoursPerDay: number; // Gross shift hours: 10
-  netWorkHoursPerDay?: number; // Net working hours after breaks: 8
+  netWorkHoursPerDay?: number; // Net working hours after breaks: 8.5
   workingDays: number[]; // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
   startTime: string; // e.g. "08:30"
   endTime: string;   // e.g. "18:30"
-  breakHours: number; // Total break hours: 2 (1h lunch + 30m morning + 30m afternoon)
+  breakHours: number; // Total break hours: 1.5 (1h lunch + 15m morning + 15m afternoon)
   breakBreakdown?: BreakScheduleBreakdown;
   isDefault?: boolean;
 }

@@ -3,7 +3,6 @@ import { useApp } from '../../context/AppContext';
 import { User, Role } from '../../types';
 import {
   Users,
-  Plus,
   Edit,
   Trash2,
   CheckCircle,
@@ -11,16 +10,13 @@ import {
   Shield,
   Search,
   X,
-  CalendarCheck,
 } from 'lucide-react';
-import { WorkScheduleSettingsModal } from '../common/WorkScheduleSettingsModal';
 
 export const UserManagementPage: React.FC = () => {
   const {
     users,
     departments,
     workingSchedules,
-    createUser,
     updateUser,
     currentUser,
   } = useApp();
@@ -29,7 +25,6 @@ export const UserManagementPage: React.FC = () => {
   const [selectedDept, setSelectedDept] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [scheduleModalUser, setScheduleModalUser] = useState<User | null>(null);
 
   // Form states
   const [employeeId, setEmployeeId] = useState('');
@@ -56,20 +51,6 @@ export const UserManagementPage: React.FC = () => {
     }
     return true;
   });
-
-  const openCreateModal = () => {
-    setEditingUser(null);
-    setEmployeeId(`EMP-${String(users.length + 1).padStart(3, '0')}`);
-    setName('');
-    setEmail('');
-    setRole('TASK_USER');
-    setDepartmentId(departments[0]?.id || 'DEPT-001');
-    setTitle('');
-    setWorkingScheduleId(workingSchedules[0]?.id || 'SCH-001');
-    setStatus('Active');
-    setErrors({});
-    setIsModalOpen(true);
-  };
 
   const openEditModal = (u: User) => {
     setEditingUser(u);
@@ -109,17 +90,6 @@ export const UserManagementPage: React.FC = () => {
         workingScheduleId,
         status,
       });
-    } else {
-      createUser({
-        employeeId,
-        name,
-        email,
-        role,
-        departmentId,
-        title,
-        workingScheduleId,
-        status,
-      });
     }
 
     setIsModalOpen(false);
@@ -134,13 +104,6 @@ export const UserManagementPage: React.FC = () => {
             User Management & Role Access Control
           </h2>
         </div>
-
-        <button
-          onClick={openCreateModal}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg shadow-xs flex items-center gap-1.5 transition-colors"
-        >
-          <Plus className="w-4 h-4" /> Add New User
-        </button>
       </div>
 
       {/* Filter and Search Bar */}
@@ -244,13 +207,6 @@ export const UserManagementPage: React.FC = () => {
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
-                          onClick={() => setScheduleModalUser(user)}
-                          className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Configure Work Schedule"
-                        >
-                          <CalendarCheck className="w-3.5 h-3.5" />
-                        </button>
-                        <button
                           onClick={() => openEditModal(user)}
                           className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors"
                           title="Edit User"
@@ -291,7 +247,7 @@ export const UserManagementPage: React.FC = () => {
           <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-lg w-full p-6 text-slate-800 animate-in zoom-in-95 my-8">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h3 className="text-base font-bold text-slate-900">
-                {editingUser ? 'Edit User Account' : 'Create New User Account'}
+                Edit User Account
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -436,20 +392,13 @@ export const UserManagementPage: React.FC = () => {
                   type="submit"
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow-xs"
                 >
-                  {editingUser ? 'Save Changes' : 'Create User'}
+                  Save Changes
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-
-      {/* Work Schedule Settings Modal for Selected User */}
-      <WorkScheduleSettingsModal
-        isOpen={Boolean(scheduleModalUser)}
-        onClose={() => setScheduleModalUser(null)}
-        targetUser={scheduleModalUser}
-      />
     </div>
   );
 };

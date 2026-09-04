@@ -99,10 +99,11 @@ export function calculateAvailableWorkingHours(
   holidayCount: number;
 } {
   const shiftHoursPerDay = schedule?.hoursPerDay || 10;
-  const breakHoursPerDay = schedule?.breakHours !== undefined ? schedule.breakHours : 2;
+  const breakHoursPerDay = schedule?.breakHours !== undefined ? schedule.breakHours : 1.5;
   const netHoursPerDay =
-    schedule?.netWorkHoursPerDay ||
-    (shiftHoursPerDay - breakHoursPerDay > 0 ? shiftHoursPerDay - breakHoursPerDay : shiftHoursPerDay);
+    schedule?.netWorkHoursPerDay !== undefined
+      ? schedule.netWorkHoursPerDay
+      : (shiftHoursPerDay - breakHoursPerDay > 0 ? shiftHoursPerDay - breakHoursPerDay : shiftHoursPerDay);
 
   if (!startDateStr) {
     return {
