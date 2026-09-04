@@ -38,8 +38,6 @@ import {
   Bar,
   LineChart,
   Line,
-  AreaChart,
-  Area,
   PieChart,
   Pie,
   Cell,
@@ -536,6 +534,39 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
     }));
   }, [departmentFteData]);
 
+  // ================= DYNAMIC SIZING HELPERS FOR LANDSCAPE CHARTS =================
+  // Dynamic height for team utilization horizontal bar chart based on data count
+  const employeeUtilizationChartHeight = useMemo(() => {
+    return Math.max(280, Math.min(850, employeeUtilizationData.length * 44 + 60));
+  }, [employeeUtilizationData.length]);
+
+  // Dynamic height for employee workload density horizontal bar chart
+  const employeeWorkloadChartHeight = useMemo(() => {
+    return Math.max(260, Math.min(800, employeeWorkloadData.length * 42 + 50));
+  }, [employeeWorkloadData.length]);
+
+  // Dynamic bar sizing for department charts to ensure optimal visual density
+  const deptBarSize = useMemo(() => {
+    const count = departmentFteData.length;
+    if (count <= 1) return 56;
+    if (count <= 3) return 44;
+    if (count <= 6) return 32;
+    return 24;
+  }, [departmentFteData.length]);
+
+  // Employee capacity breakdown counts for summary badges
+  const employeeCapacityStats = useMemo(() => {
+    let under = 0;
+    let atCap = 0;
+    let over = 0;
+    employeeUtilizationData.forEach(e => {
+      if (isOverCapacity(e.status)) over++;
+      else if (isAtCapacity(e.status)) atCap++;
+      else under++;
+    });
+    return { under, atCap, over, total: employeeUtilizationData.length };
+  }, [employeeUtilizationData]);
+
   return (
     <div className="space-y-6 pb-12 font-sans">
       {/* ================= TOP HEADER & ROLE BADGE BANNER ================= */}
@@ -780,250 +811,247 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
       {/* ================= SECTION 1: FTE & CAPACITY ================= */}
       {(activeSection === 'all' || activeSection === 'fte') && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* FTE Utilization by Department */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          {/* 1. FTE Utilization by Department (Landscape Card) */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900">FTE Utilization by Department</h3>
-                    <p className="text-xs text-slate-500">Available capacity vs logged effort across delivery units</p>
-                  </div>
-                  <span className="text-xs font-semibold px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg">
-                    {departmentFteData.length} Departments
-                  </span>
-                </div>
-
-                <div className="h-64 mt-4">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={departmentFteData} margin={{ top: 10, right: 10, left: -10, bottom: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                      <XAxis dataKey="code" tick={{ fontSize: 11, fill: '#475569' }} />
-                      <YAxis tick={{ fontSize: 11, fill: '#475569' }} unit="h" />
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload;
-                            return (
-                              <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl text-xs border border-slate-700 space-y-1">
-                                <p className="font-bold text-sm text-blue-300">{data.department}</p>
-                                <p className="text-slate-300">Staff Count: <strong>{data.headcount}</strong></p>
-                                <p className="text-slate-300">Available Capacity: <strong>{data.availableHours}h</strong></p>
-                                <p className="text-slate-300">Logged Hours: <strong>{data.actualHours}h</strong></p>
-                                <div className="pt-1 mt-1 border-t border-slate-700 flex justify-between gap-4">
-                                  <span className="text-slate-400">FTE Utilization:</span>
-                                  <span className="font-bold text-emerald-400">{data.ftePercent}%</span>
-                                </div>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
-                      <Bar dataKey="availableHours" name="Available Capacity (h)" fill="#94A3B8" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="actualHours" name="Actual Logged (h)" fill="#2563EB" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                <h3 className="text-sm font-bold text-slate-900">FTE Utilization by Department</h3>
+                <p className="text-xs text-slate-500">Available capacity vs logged effort across delivery units</p>
               </div>
-
-              <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
-                {departmentFteData.map(d => (
-                  <div key={d.id} className="p-2 bg-slate-50 rounded-xl">
-                    <span className="font-semibold text-slate-700 truncate block">{d.code}</span>
-                    <span
-                      className={`text-sm font-bold block mt-0.5 ${
-                        d.ftePercent > 100 ? 'text-rose-600' : d.ftePercent >= 80 ? 'text-emerald-600' : 'text-blue-600'
-                      }`}
-                    >
-                      {d.ftePercent}%
-                    </span>
-                    <span className="text-[10px] text-slate-400">
-                      {d.actualHours}h / {d.availableHours}h
-                    </span>
-                  </div>
-                ))}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg">
+                  {departmentFteData.length} Departments
+                </span>
+                <span className="text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg border border-blue-200">
+                  Avg FTE: {totalAvailableHours > 0 ? ((totalActualHours / totalAvailableHours) * 100).toFixed(1) : 0}%
+                </span>
               </div>
             </div>
 
-            {/* Employee Utilization Rate (Horizontal Bar Chart) */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900">Team Member Utilization</h3>
-                    <p className="text-xs text-slate-500">Benchmark: Under (&lt;100%), At Cap (=100%), Over (&gt;100%)</p>
-                  </div>
-                  <div className="flex items-center gap-2 text-[10px]">
-                    <span className="flex items-center gap-1 text-slate-600 font-medium">
-                      <span className="w-2 h-2 rounded-full bg-blue-500" /> &lt;100% Under
-                    </span>
-                    <span className="flex items-center gap-1 text-slate-600 font-medium">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" /> =100% At Cap
-                    </span>
-                    <span className="flex items-center gap-1 text-slate-600 font-medium">
-                      <span className="w-2 h-2 rounded-full bg-rose-500" /> &gt;100% Over
-                    </span>
-                  </div>
-                </div>
+            <div className="h-72 sm:h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={departmentFteData}
+                  margin={{ top: 15, right: 20, left: -5, bottom: 20 }}
+                  barSize={deptBarSize}
+                  maxBarSize={48}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                  <XAxis dataKey="code" tick={{ fontSize: 12, fill: '#475569', fontWeight: 600 }} />
+                  <YAxis tick={{ fontSize: 11, fill: '#475569' }} unit="h" />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl text-xs border border-slate-700 space-y-1">
+                            <p className="font-bold text-sm text-blue-300">{data.department}</p>
+                            <p className="text-slate-300">Staff Count: <strong>{data.headcount}</strong></p>
+                            <p className="text-slate-300">Available Capacity: <strong>{data.availableHours}h</strong></p>
+                            <p className="text-slate-300">Logged Hours: <strong>{data.actualHours}h</strong></p>
+                            <div className="pt-1 mt-1 border-t border-slate-700 flex justify-between gap-4">
+                              <span className="text-slate-400">FTE Utilization:</span>
+                              <span className="font-bold text-emerald-400">{data.ftePercent}%</span>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
+                  <ReferenceLine y={100} stroke="#10B981" strokeDasharray="4 4" label={{ value: '100% Target', fill: '#059669', fontSize: 10, position: 'top' }} />
+                  <Bar dataKey="availableHours" name="Available Capacity (h)" fill="#94A3B8" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="actualHours" name="Actual Logged (h)" fill="#2563EB" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
 
-                <div className="h-64 mt-4">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={employeeUtilizationData}
-                      layout="vertical"
-                      margin={{ top: 5, right: 20, left: 40, bottom: 5 }}
+            <div className="pt-4 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 text-center text-xs">
+              {departmentFteData.map(d => (
+                <div key={d.id} className="p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200/60 transition-colors">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-slate-800 truncate">{d.code}</span>
+                    <span
+                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                        d.ftePercent > 100
+                          ? 'bg-rose-100 text-rose-700'
+                          : d.ftePercent === 100
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-blue-100 text-blue-700'
+                      }`}
                     >
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
-                      <XAxis type="number" domain={[0, 'dataMax + 20']} unit="%" tick={{ fontSize: 11, fill: '#475569' }} />
-                      <YAxis dataKey="employee" type="category" tick={{ fontSize: 11, fill: '#1E293B', width: 90 }} />
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload;
-                            return (
-                              <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl text-xs border border-slate-700 space-y-1">
-                                <p className="font-bold text-sm text-white">{data.employee}</p>
-                                <p className="text-slate-300">Dept: <strong>{data.department}</strong></p>
-                                <p className="text-slate-300">Actual Logged: <strong>{data.actualHours}h</strong></p>
-                                <p className="text-slate-300">Available: <strong>{data.availableHours}h</strong></p>
-                                <div className="pt-1 mt-1 border-t border-slate-700 flex justify-between gap-3">
-                                  <span className="text-slate-400">Capacity Status:</span>
-                                  <span className={`font-bold ${isOverCapacity(data.status) ? 'text-rose-400' : isAtCapacity(data.status) ? 'text-emerald-400' : 'text-blue-400'}`}>
-                                    {data.ftePercent}% ({data.status})
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <ReferenceLine x={100} stroke="#10B981" strokeDasharray="3 3" label={{ value: '100% Target', fill: '#059669', fontSize: 10, position: 'top' }} />
-                      <Bar dataKey="ftePercent" name="FTE Utilization %" radius={[0, 4, 4, 0]}>
-                        {employeeUtilizationData.map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={
-                              isOverCapacity(entry.status)
-                                ? '#EF4444'
-                                : isAtCapacity(entry.status)
-                                ? '#10B981'
-                                : '#3B82F6'
-                            }
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                      {d.ftePercent > 100 ? 'Over' : d.ftePercent === 100 ? 'At Cap' : 'Under'}
+                    </span>
+                  </div>
+                  <span
+                    className={`text-base font-bold block ${
+                      d.ftePercent > 100 ? 'text-rose-600' : d.ftePercent === 100 ? 'text-emerald-600' : 'text-blue-600'
+                    }`}
+                  >
+                    {d.ftePercent}%
+                  </span>
+                  <span className="text-[10px] text-slate-500 block mt-0.5">
+                    {d.actualHours}h / {d.availableHours}h • {d.headcount} staff
+                  </span>
                 </div>
-              </div>
-
-              <div className="mt-3 pt-2 text-[11px] text-slate-500 flex items-center justify-between">
-                <span>Ranked by utilization load</span>
-                <span className="font-semibold text-slate-700">{employeeUtilizationData.length} team members</span>
-              </div>
+              ))}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* FTE Utilization Trajectory Trend */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-              <div className="flex items-center justify-between mb-2">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">Workforce Utilization Trajectory</h3>
-                  <p className="text-xs text-slate-500">Weekly trajectory against the 80%–100% capacity corridor</p>
-                </div>
-                <span className="text-xs bg-blue-50 text-blue-700 font-semibold px-2.5 py-1 rounded-lg border border-blue-200">
-                  August 2026
-                </span>
+          {/* 2. Team Member Utilization (Landscape Card with Dynamic Height) */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Team Member Utilization</h3>
+                <p className="text-xs text-slate-500">Benchmark: Under (&lt;100%), At Capacity (=100%), Over Capacity (&gt;100%)</p>
               </div>
-
-              <div className="h-60 mt-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={fteTrendData} margin={{ top: 10, right: 15, left: -10, bottom: 20 }}>
-                    <defs>
-                      <linearGradient id="fteGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#2563EB" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#2563EB" stopOpacity={0.0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                    <XAxis dataKey="period" tick={{ fontSize: 11, fill: '#475569' }} />
-                    <YAxis tick={{ fontSize: 11, fill: '#475569' }} unit="%" domain={[0, 130]} />
-                    <Tooltip
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload;
-                          return (
-                            <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl text-xs border border-slate-700 space-y-1">
-                              <p className="font-bold text-sm text-blue-300">{data.period}</p>
-                              <p className="text-slate-300">Logged: <strong>{data.actualHours}h</strong></p>
-                              <p className="text-slate-300">Capacity: <strong>{data.availableHours}h</strong></p>
-                              <p className="text-emerald-400 font-bold text-sm pt-1 border-t border-slate-700">
-                                FTE: {data.ftePercent}%
-                              </p>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    <ReferenceLine y={80} stroke="#10B981" strokeDasharray="4 4" label={{ value: '80%', fill: '#10B981', fontSize: 10 }} />
-                    <ReferenceLine y={100} stroke="#EF4444" strokeDasharray="4 4" label={{ value: '100%', fill: '#EF4444', fontSize: 10 }} />
-                    <Area type="monotone" dataKey="ftePercent" name="FTE Utilization %" stroke="#2563EB" strokeWidth={2.5} fillOpacity={1} fill="url(#fteGradient)" />
-                  </AreaChart>
-                </ResponsiveContainer>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg font-semibold border border-blue-200">
+                  <span className="w-2 h-2 rounded-full bg-blue-500" />
+                  &lt;100% Under ({employeeCapacityStats.under})
+                </span>
+                <span className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg font-semibold border border-emerald-200">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  =100% At Cap ({employeeCapacityStats.atCap})
+                </span>
+                <span className="flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 text-rose-700 rounded-lg font-semibold border border-rose-200">
+                  <span className="w-2 h-2 rounded-full bg-rose-500" />
+                  &gt;100% Over ({employeeCapacityStats.over})
+                </span>
               </div>
             </div>
 
-            {/* Shift vs Actual Hours (Effort Variance) */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-              <div className="flex items-center justify-between mb-2">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">Shift Hours vs Actual Hours</h3>
-                  <p className="text-xs text-slate-500">Shift hours vs actual hours variance by department</p>
-                </div>
-                <span className="text-xs text-slate-500 font-medium">
-                  Net Variance:{' '}
-                  <strong className={totalActualHours - totalPlannedHours > 0 ? 'text-rose-600' : 'text-emerald-600'}>
-                    {totalActualHours - totalPlannedHours > 0 ? '+' : ''}{(totalActualHours - totalPlannedHours).toFixed(1)}h
-                  </strong>
-                </span>
-              </div>
-
-              <div className="h-60 mt-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={plannedVsActualData} margin={{ top: 10, right: 10, left: -10, bottom: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#475569' }} />
-                    <YAxis tick={{ fontSize: 11, fill: '#475569' }} unit="h" />
-                    <Tooltip
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload;
-                          const isOver = data.Variance > 0;
-                          return (
-                            <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl text-xs border border-slate-700 space-y-1">
-                              <p className="font-bold text-sm text-blue-300">{data.fullName}</p>
-                              <p className="text-slate-300">Shift Hours: <strong>{data.Shift ?? data.Planned}h</strong></p>
-                              <p className="text-slate-300">Actual Hours: <strong>{data.Actual}h</strong></p>
-                              <p className={`pt-1 border-t border-slate-700 font-bold ${isOver ? 'text-rose-400' : 'text-emerald-400'}`}>
-                                Variance: {isOver ? '+' : ''}{data.Variance}h
-                              </p>
+            {/* Dynamic height based on employee count to prevent cramped bars */}
+            <div style={{ height: `${employeeUtilizationChartHeight}px` }} className="w-full transition-all duration-300">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={employeeUtilizationData}
+                  layout="vertical"
+                  margin={{ top: 10, right: 30, left: 15, bottom: 10 }}
+                  barSize={Math.max(16, Math.min(26, 320 / Math.max(employeeUtilizationData.length, 1)))}
+                  maxBarSize={24}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
+                  <XAxis type="number" domain={[0, 'dataMax + 20']} unit="%" tick={{ fontSize: 11, fill: '#475569' }} />
+                  <YAxis dataKey="employee" type="category" tick={{ fontSize: 11, fill: '#1E293B', fontWeight: 500 }} width={140} />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl text-xs border border-slate-700 space-y-1">
+                            <p className="font-bold text-sm text-white">{data.employee}</p>
+                            <p className="text-slate-300">Dept: <strong>{data.department}</strong></p>
+                            <p className="text-slate-300">Actual Logged: <strong>{data.actualHours}h</strong></p>
+                            <p className="text-slate-300">Available: <strong>{data.availableHours}h</strong></p>
+                            <div className="pt-1 mt-1 border-t border-slate-700 flex justify-between gap-3">
+                              <span className="text-slate-400">Capacity Status:</span>
+                              <span className={`font-bold ${isOverCapacity(data.status) ? 'text-rose-400' : isAtCapacity(data.status) ? 'text-emerald-400' : 'text-blue-400'}`}>
+                                {data.ftePercent}% ({data.status})
+                              </span>
                             </div>
-                          );
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <ReferenceLine x={100} stroke="#10B981" strokeDasharray="3 3" label={{ value: '100% Target', fill: '#059669', fontSize: 10, position: 'top' }} />
+                  <Bar dataKey="ftePercent" name="FTE Utilization %" radius={[0, 6, 6, 0]}>
+                    {employeeUtilizationData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={
+                          isOverCapacity(entry.status)
+                            ? '#EF4444'
+                            : isAtCapacity(entry.status)
+                            ? '#10B981'
+                            : '#3B82F6'
                         }
-                        return null;
-                      }}
-                    />
-                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
-                    <Bar dataKey="Shift" name="Shift Hours" fill="#94A3B8" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="Actual" name="Actual Hours" fill="#2563EB" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 text-xs text-slate-500 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span>Dynamic height adapts to team roster size ({employeeUtilizationData.length} active members)</span>
+              <span className="font-semibold text-slate-700">Ranked by highest workload demand</span>
+            </div>
+          </div>
+
+          {/* Shift Hours vs Actual Hours (Landscape Card) */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Shift Hours vs Actual Hours</h3>
+                <p className="text-xs text-slate-500">Planned shift hours vs logged actual hours effort variance by department</p>
               </div>
+              <span className="text-xs text-slate-600 font-medium px-3 py-1 bg-slate-100 rounded-lg">
+                Net Workforce Variance:{' '}
+                <strong className={totalActualHours - totalPlannedHours > 0 ? 'text-rose-600' : 'text-emerald-600'}>
+                  {totalActualHours - totalPlannedHours > 0 ? '+' : ''}{(totalActualHours - totalPlannedHours).toFixed(1)}h
+                </strong>
+              </span>
+            </div>
+
+            <div className="h-72 sm:h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={plannedVsActualData}
+                  margin={{ top: 15, right: 20, left: -5, bottom: 20 }}
+                  barSize={deptBarSize}
+                  maxBarSize={44}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#475569', fontWeight: 600 }} />
+                  <YAxis tick={{ fontSize: 11, fill: '#475569' }} unit="h" />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        const isOver = data.Variance > 0;
+                        return (
+                          <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl text-xs border border-slate-700 space-y-1">
+                            <p className="font-bold text-sm text-blue-300">{data.fullName}</p>
+                            <p className="text-slate-300">Shift Hours: <strong>{data.Shift ?? data.Planned}h</strong></p>
+                            <p className="text-slate-300">Actual Hours: <strong>{data.Actual}h</strong></p>
+                            <p className={`pt-1 border-t border-slate-700 font-bold ${isOver ? 'text-rose-400' : 'text-emerald-400'}`}>
+                              Variance: {isOver ? '+' : ''}{data.Variance}h
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
+                  <Bar dataKey="Shift" name="Shift Hours (h)" fill="#94A3B8" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="Actual" name="Actual Hours (h)" fill="#2563EB" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 text-center text-xs">
+              {plannedVsActualData.map(d => (
+                <div key={d.name} className="p-3 bg-slate-50 rounded-xl border border-slate-200/60">
+                  <span className="font-bold text-slate-800 truncate block">{d.name}</span>
+                  <div className="mt-1 flex items-baseline justify-center gap-1">
+                    <span className="text-slate-500">{d.Shift}h shift</span>
+                    <span className="text-slate-300">•</span>
+                    <span className="font-bold text-slate-900">{d.Actual}h act</span>
+                  </div>
+                  <span
+                    className={`text-[11px] font-bold block mt-1 ${
+                      d.Variance > 0 ? 'text-rose-600' : d.Variance < 0 ? 'text-blue-600' : 'text-emerald-600'
+                    }`}
+                  >
+                    {d.Variance > 0 ? `+${d.Variance}h over` : d.Variance < 0 ? `${d.Variance}h under` : 'Balanced'}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -1032,164 +1060,215 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
       {/* ================= SECTION 2: WORKLOAD & ALLOCATION ================= */}
       {(activeSection === 'all' || activeSection === 'workload') && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Task Status Donut */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          {/* 5. Task Status Breakdown (Landscape Card) */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <div className="mb-2">
-                  <h3 className="text-sm font-bold text-slate-900">Task Status Breakdown</h3>
-                  <p className="text-xs text-slate-500">Live operational lifecycle status</p>
-                </div>
+                <h3 className="text-sm font-bold text-slate-900">Task Status Breakdown</h3>
+                <p className="text-xs text-slate-500">Live operational lifecycle status across all active tasks</p>
+              </div>
+              <span className="text-xs font-semibold px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg">
+                {totalTasks} Total Tasks in Scope
+              </span>
+            </div>
 
-                <div className="h-52 relative mt-2 flex items-center justify-center">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={taskStatusDistribution}
-                        innerRadius={52}
-                        outerRadius={80}
-                        paddingAngle={3}
-                        dataKey="value"
-                      >
-                        {taskStatusDistribution.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload;
-                            const pct = totalTasks > 0 ? Math.round((data.value / totalTasks) * 100) : 0;
-                            return (
-                              <div className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-lg">
-                                {data.name}: {data.value} tasks ({pct}%)
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="absolute text-center pointer-events-none">
-                    <span className="text-xl font-bold text-slate-900 block leading-tight">{totalTasks}</span>
-                    <span className="text-[10px] text-slate-400 font-medium uppercase">Tasks</span>
-                  </div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center pt-2">
+              <div className="lg:col-span-5 h-64 relative flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={taskStatusDistribution}
+                      innerRadius={68}
+                      outerRadius={96}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {taskStatusDistribution.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          const pct = totalTasks > 0 ? Math.round((data.value / totalTasks) * 100) : 0;
+                          return (
+                            <div className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-lg">
+                              {data.name}: {data.value} tasks ({pct}%)
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute text-center pointer-events-none">
+                  <span className="text-2xl font-bold text-slate-900 block leading-tight">{totalTasks}</span>
+                  <span className="text-[10px] text-slate-400 font-semibold uppercase">Total Tasks</span>
                 </div>
               </div>
 
-              <div className="space-y-1.5 pt-2 border-t border-slate-100 text-xs">
+              <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 {taskStatusDistribution.map(st => {
                   const pct = totalTasks > 0 ? Math.round((st.value / totalTasks) * 100) : 0;
                   return (
-                    <div key={st.name} className="flex items-center justify-between text-slate-700">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: st.color }} />
-                        <span className="font-medium">{st.name}</span>
+                    <div
+                      key={st.name}
+                      className="p-3.5 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200/70 transition-colors"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: st.color }} />
+                          <span className="font-bold text-slate-800">{st.name}</span>
+                        </div>
+                        <span className="font-bold text-slate-900">
+                          {st.value} <span className="text-slate-400 font-normal">({pct}%)</span>
+                        </span>
                       </div>
-                      <span className="font-semibold text-slate-900">
-                        {st.value} <span className="text-slate-400 font-normal">({pct}%)</span>
-                      </span>
+                      <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${pct}%`, backgroundColor: st.color }}
+                        />
+                      </div>
                     </div>
                   );
                 })}
               </div>
             </div>
+          </div>
 
-            {/* Task Volume by Department */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          {/* 6. Task Volume by Department (Landscape Card) */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <div className="mb-2">
-                  <h3 className="text-sm font-bold text-slate-900">Volume by Department</h3>
-                  <p className="text-xs text-slate-500">In Progress vs Completed workstreams</p>
-                </div>
-
-                <div className="h-52 mt-2">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={taskVolumeByDeptData} margin={{ top: 10, right: 10, left: -15, bottom: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                      <XAxis dataKey="department" tick={{ fontSize: 10, fill: '#475569' }} />
-                      <YAxis tick={{ fontSize: 11, fill: '#475569' }} allowDecimals={false} />
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload;
-                            return (
-                              <div className="bg-slate-900 text-white p-2.5 rounded-xl shadow-lg text-xs space-y-1">
-                                <p className="font-bold text-blue-300">{data.fullName}</p>
-                                <p>Total: <strong>{data.totalTasks}</strong></p>
-                                <p className="text-blue-300">In Progress: {data.inProgress}</p>
-                                <p className="text-emerald-300">Completed: {data.completed}</p>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <Bar dataKey="inProgress" name="In Progress" fill="#2563EB" stackId="a" />
-                      <Bar dataKey="completed" name="Completed" fill="#10B981" stackId="a" />
-                      <Bar dataKey="others" name="Other Status" fill="#94A3B8" stackId="a" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                <h3 className="text-sm font-bold text-slate-900">Task Volume by Department</h3>
+                <p className="text-xs text-slate-500">In Progress vs Completed workstreams across functional units</p>
               </div>
-
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                <span>Combined Department Tasks</span>
-                <span className="font-bold text-slate-800">{totalTasks} tasks in scope</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg border border-blue-200">
+                  {taskVolumeByDeptData.reduce((acc, d) => acc + d.inProgress, 0)} In Progress
+                </span>
+                <span className="text-xs font-semibold px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-200">
+                  {taskVolumeByDeptData.reduce((acc, d) => acc + d.completed, 0)} Completed
+                </span>
               </div>
             </div>
 
-            {/* Employee Workload Density */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
-              <div>
-                <div className="mb-2">
-                  <h3 className="text-sm font-bold text-slate-900">Workload Density</h3>
-                  <p className="text-xs text-slate-500">Planned hours vs Available capacity</p>
-                </div>
+            <div className="h-72 sm:h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={taskVolumeByDeptData}
+                  margin={{ top: 15, right: 20, left: -10, bottom: 20 }}
+                  barSize={deptBarSize}
+                  maxBarSize={48}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                  <XAxis dataKey="department" tick={{ fontSize: 12, fill: '#475569', fontWeight: 600 }} />
+                  <YAxis tick={{ fontSize: 11, fill: '#475569' }} allowDecimals={false} />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-slate-900 text-white p-3 rounded-xl shadow-lg text-xs space-y-1">
+                            <p className="font-bold text-sm text-blue-300">{data.fullName}</p>
+                            <p>Total Tasks: <strong>{data.totalTasks}</strong></p>
+                            <p className="text-blue-300">In Progress: {data.inProgress}</p>
+                            <p className="text-emerald-300">Completed: {data.completed}</p>
+                            <p className="text-slate-400">Other: {data.others}</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
+                  <Bar dataKey="inProgress" name="In Progress" fill="#2563EB" stackId="a" />
+                  <Bar dataKey="completed" name="Completed" fill="#10B981" stackId="a" />
+                  <Bar dataKey="others" name="Other Status" fill="#94A3B8" stackId="a" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
 
-                <div className="h-52 mt-2">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={employeeWorkloadData}
-                      layout="vertical"
-                      margin={{ top: 5, right: 10, left: 35, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
-                      <XAxis type="number" tick={{ fontSize: 10, fill: '#475569' }} unit="h" />
-                      <YAxis dataKey="employee" type="category" tick={{ fontSize: 10, fill: '#1E293B', width: 85 }} />
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload;
-                            return (
-                              <div className="bg-slate-900 text-white p-2.5 rounded-xl shadow-lg text-xs space-y-1">
-                                <p className="font-bold text-white">{data.employee}</p>
-                                <p className="text-slate-300">Shift Hours: <strong>{data.plannedHours}h</strong></p>
-                                <p className="text-slate-300">Available: <strong>{data.availableHours}h</strong></p>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <Bar dataKey="availableHours" name="Available (h)" fill="#CBD5E1" radius={[0, 4, 4, 0]} />
-                      <Bar dataKey="plannedHours" name="Shift Hours (h)" fill="#6366F1" radius={[0, 4, 4, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-slate-100 text-xs text-slate-500 flex justify-between">
-                <span>Planning density</span>
-                <span className="font-semibold text-slate-700">{totalPlannedHours}h total shift</span>
-              </div>
+            <div className="pt-4 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 text-center text-xs">
+              {taskVolumeByDeptData.map(d => {
+                const completionRate = d.totalTasks > 0 ? Math.round((d.completed / d.totalTasks) * 100) : 0;
+                return (
+                  <div key={d.department} className="p-3 bg-slate-50 rounded-xl border border-slate-200/60">
+                    <span className="font-bold text-slate-800 truncate block">{d.department}</span>
+                    <span className="text-base font-bold text-slate-900 block mt-1">{d.totalTasks} tasks</span>
+                    <span className="text-[10px] text-emerald-600 font-semibold block mt-0.5">
+                      {completionRate}% Completed ({d.completed}/{d.totalTasks})
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          {/* Time Allocation by Work Type */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+          {/* 7. Employee Workload Density (Landscape Card with Dynamic Height) */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Employee Workload Density</h3>
+                <p className="text-xs text-slate-500">Planned shift hours vs available capacity across team roster</p>
+              </div>
+              <span className="text-xs font-semibold px-3 py-1 bg-slate-100 text-slate-700 rounded-lg">
+                Total Planned Shifts: <strong>{totalPlannedHours} Hours</strong>
+              </span>
+            </div>
+
+            {/* Dynamic height based on employee count */}
+            <div style={{ height: `${employeeWorkloadChartHeight}px` }} className="w-full transition-all duration-300">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={employeeWorkloadData}
+                  layout="vertical"
+                  margin={{ top: 10, right: 30, left: 15, bottom: 10 }}
+                  barSize={Math.max(16, Math.min(24, 300 / Math.max(employeeWorkloadData.length, 1)))}
+                  maxBarSize={24}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: '#475569' }} unit="h" />
+                  <YAxis dataKey="employee" type="category" tick={{ fontSize: 11, fill: '#1E293B', fontWeight: 500 }} width={140} />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-slate-900 text-white p-3 rounded-xl shadow-lg text-xs space-y-1">
+                            <p className="font-bold text-sm text-white">{data.employee}</p>
+                            <p className="text-slate-300">Shift Hours: <strong>{data.plannedHours}h</strong></p>
+                            <p className="text-slate-300">Available Capacity: <strong>{data.availableHours}h</strong></p>
+                            <p className="text-indigo-400 font-semibold pt-1 border-t border-slate-700">
+                              Load: {data.availableHours > 0 ? Math.round((data.plannedHours / data.availableHours) * 100) : 0}% of capacity
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
+                  <Bar dataKey="availableHours" name="Available Capacity (h)" fill="#CBD5E1" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="plannedHours" name="Shift Hours (h)" fill="#6366F1" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 text-xs text-slate-500 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span>Dynamic height adapts to roster volume ({employeeWorkloadData.length} team members)</span>
+              <span className="font-semibold text-slate-700">
+                Average Shift Load: {employeeWorkloadData.length > 0 ? (totalPlannedHours / employeeWorkloadData.length).toFixed(1) : 0}h per person
+              </span>
+            </div>
+          </div>
+
+          {/* 8. Time Allocation by Work Type (Landscape Card) */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <h3 className="text-base font-bold text-slate-900">Time Allocation by Work Type</h3>
                 <p className="text-xs text-slate-500">Tracked effort breakdown by functional stream</p>
@@ -1199,14 +1278,14 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
               </span>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-              <div className="lg:col-span-5 h-60 relative flex items-center justify-center">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center pt-2">
+              <div className="lg:col-span-5 h-64 relative flex items-center justify-center">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={timeAllocationData}
-                      innerRadius={65}
-                      outerRadius={100}
+                      innerRadius={68}
+                      outerRadius={102}
                       paddingAngle={2}
                       dataKey="hours"
                     >
@@ -1237,22 +1316,22 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
                 </div>
               </div>
 
-              <div className="lg:col-span-7 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+              <div className="lg:col-span-7 grid grid-cols-2 sm:grid-cols-3 gap-3.5 text-xs">
                 {timeAllocationData.map(item => (
                   <div
                     key={item.name}
-                    className="p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200/70 transition-colors"
+                    className="p-3.5 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200/70 transition-colors"
                   >
-                    <div className="flex items-center gap-1.5 mb-1.5">
+                    <div className="flex items-center gap-2 mb-2">
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                      <span className="font-semibold text-slate-800 truncate">{item.name}</span>
+                      <span className="font-bold text-slate-800 truncate">{item.name}</span>
                     </div>
                     <div className="flex items-baseline justify-between">
                       <span className="text-base font-bold text-slate-900">{item.hours}h</span>
                       <span className="text-[11px] font-semibold text-slate-500">{item.percentage}%</span>
                     </div>
-                    <div className="w-full h-1.5 bg-slate-200 rounded-full mt-1.5 overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${item.percentage}%`, backgroundColor: item.color }} />
+                    <div className="w-full h-1.5 bg-slate-200 rounded-full mt-2 overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${item.percentage}%`, backgroundColor: item.color }} />
                     </div>
                   </div>
                 ))}
@@ -1265,238 +1344,89 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
       {/* ================= SECTION 3: DEADLINES & COMPLIANCE ================= */}
       {(activeSection === 'all' || activeSection === 'compliance') && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Overdue Tasks by Department with Drill-down */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          {/* 9. Overdue Tasks by Department (Landscape Card) */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                      Overdue Tasks by Department
-                      {overdueTasksCount > 0 && (
-                        <span className="bg-rose-100 text-rose-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                          {overdueTasksCount} Total
-                        </span>
-                      )}
-                    </h3>
-                    <p className="text-xs text-slate-500">Uncompleted tasks past deadline</p>
-                  </div>
-
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  Overdue Tasks by Department
                   {overdueTasksCount > 0 && (
-                    <button
-                      onClick={() => {
-                        setSelectedOverdueDept(null);
-                        setIsOverdueModalOpen(true);
-                      }}
-                      className="text-xs text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-                    >
-                      <span>Drill Down</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
+                    <span className="bg-rose-100 text-rose-700 text-xs font-bold px-2.5 py-0.5 rounded-full">
+                      {overdueTasksCount} Overdue Items
+                    </span>
                   )}
-                </div>
-
-                <div className="h-56 mt-4">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={overdueTasksByDeptData} margin={{ top: 10, right: 10, left: -15, bottom: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                      <XAxis dataKey="department" tick={{ fontSize: 11, fill: '#475569' }} />
-                      <YAxis tick={{ fontSize: 11, fill: '#475569' }} allowDecimals={false} />
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload;
-                            return (
-                              <div className="bg-slate-900 text-white p-2.5 rounded-xl shadow-lg text-xs space-y-1">
-                                <p className="font-bold text-rose-300">{data.fullName}</p>
-                                <p>Overdue Tasks: <strong className="text-rose-400">{data.overdueCount}</strong></p>
-                                <p className="text-[10px] text-slate-400">Click bar to inspect list</p>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <Bar
-                        dataKey="overdueCount"
-                        name="Overdue Tasks"
-                        fill="#EF4444"
-                        radius={[4, 4, 0, 0]}
-                        onClick={(entry) => {
-                          if (entry && entry.id) {
-                            setSelectedOverdueDept(entry.id);
-                            setIsOverdueModalOpen(true);
-                          }
-                        }}
-                        cursor="pointer"
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                </h3>
+                <p className="text-xs text-slate-500">Uncompleted tasks past deadline across delivery units</p>
               </div>
 
-              <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span className="text-slate-500">Schedule SLA: Target 0 overdue items</span>
-                {overdueTasksCount === 0 ? (
-                  <span className="text-emerald-600 font-semibold">✓ 0 Overdue Tasks</span>
-                ) : (
-                  <span className="text-rose-600 font-semibold">{overdueTasksCount} overdue tasks flagged</span>
-                )}
-              </div>
+              {overdueTasksCount > 0 && (
+                <button
+                  onClick={() => {
+                    setSelectedOverdueDept(null);
+                    setIsOverdueModalOpen(true);
+                  }}
+                  className="text-xs text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 px-3.5 py-1.5 rounded-xl font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-rose-200/60 self-start sm:self-auto"
+                >
+                  <span>Detailed Drill Down</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
-            {/* Top 10 Effort Variances */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900">Effort Variance (Top Tasks)</h3>
-                    <p className="text-xs text-slate-500">Highest variance: Actual Hours - Planned Hours</p>
-                  </div>
-                  <span className="text-xs text-slate-400 font-medium">Ranked by +Variance</span>
-                </div>
-
-                <div className="h-56 mt-3 overflow-y-auto pr-1 space-y-2 text-xs">
-                  {effortVarianceTop10.map((item, idx) => {
-                    const isPositive = item.variance > 0;
-                    return (
-                      <div
-                        key={item.id}
-                        onClick={() => onViewTask(item.task)}
-                        className="p-2 bg-slate-50 hover:bg-slate-100/90 rounded-xl border border-slate-200/70 flex items-center justify-between gap-3 cursor-pointer transition-colors"
-                      >
-                        <div className="min-w-0 flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0">
-                            {idx + 1}
-                          </span>
-                          <div className="min-w-0">
-                            <p className="font-semibold text-slate-900 truncate max-w-[220px]">
-                              {item.taskName}
-                            </p>
-                            <p className="text-[10px] text-slate-500">
-                              Shift Hour: {item.plannedHours}h • Actual: {item.actualHours}h
-                            </p>
+            <div className="h-72 sm:h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={overdueTasksByDeptData}
+                  margin={{ top: 15, right: 20, left: -10, bottom: 20 }}
+                  barSize={deptBarSize}
+                  maxBarSize={48}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                  <XAxis dataKey="department" tick={{ fontSize: 12, fill: '#475569', fontWeight: 600 }} />
+                  <YAxis tick={{ fontSize: 11, fill: '#475569' }} allowDecimals={false} />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-slate-900 text-white p-3 rounded-xl shadow-lg text-xs space-y-1">
+                            <p className="font-bold text-sm text-rose-300">{data.fullName}</p>
+                            <p>Overdue Tasks: <strong className="text-rose-400">{data.overdueCount}</strong></p>
+                            <p className="text-[10px] text-slate-400">Click bar to inspect task roster</p>
                           </div>
-                        </div>
-
-                        <div className="text-right shrink-0">
-                          <span className={`font-bold block ${isPositive ? 'text-rose-600' : 'text-emerald-600'}`}>
-                            {isPositive ? '+' : ''}{item.variance}h
-                          </span>
-                          <span className={`text-[10px] ${isPositive ? 'text-rose-500' : 'text-emerald-500'}`}>
-                            {isPositive ? '+' : ''}{item.variancePercent}%
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="mt-3 pt-2 text-[11px] text-slate-500 flex justify-between">
-                <span>Click any task to inspect details</span>
-                <span>Positive = shift hours exceeded</span>
-              </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar
+                    dataKey="overdueCount"
+                    name="Overdue Tasks"
+                    fill="#EF4444"
+                    radius={[6, 6, 0, 0]}
+                    onClick={(entry) => {
+                      if (entry && entry.id) {
+                        setSelectedOverdueDept(entry.id);
+                        setIsOverdueModalOpen(true);
+                      }
+                    }}
+                    cursor="pointer"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
 
-            {/* Overtime by Department */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900">Overtime by Department</h3>
-                    <p className="text-xs text-slate-500">Approved overtime logged beyond regular shifts</p>
-                  </div>
-                  <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
-                    {totalOvertimeHours.toFixed(1)}h Total Overtime
-                  </span>
-                </div>
-
-                <div className="h-56 mt-4">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={overtimeByDeptData} margin={{ top: 10, right: 10, left: -15, bottom: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                      <XAxis dataKey="department" tick={{ fontSize: 11, fill: '#475569' }} />
-                      <YAxis tick={{ fontSize: 11, fill: '#475569' }} unit="h" />
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload;
-                            return (
-                              <div className="bg-slate-900 text-white p-2.5 rounded-xl shadow-lg text-xs space-y-1">
-                                <p className="font-bold text-amber-300">{data.fullName}</p>
-                                <p>Approved Overtime: <strong>{data.overtimeHours} hours</strong></p>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <Bar dataKey="overtimeHours" name="Overtime Hours" fill="#F59E0B" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              <div className="mt-3 pt-3 border-t border-slate-100 text-xs text-slate-500">
-                Overtime monitoring signals delivery pressure and potential staffing adjustment needs.
-              </div>
-            </div>
-
-            {/* Time Tracking Compliance */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900">Time Tracking Compliance</h3>
-                    <p className="text-xs text-slate-500">Expected Working Hours vs Logged Time Sessions</p>
-                  </div>
-                  <span className="text-sm font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                    {trackingCompliancePercent}% Compliant
-                  </span>
-                </div>
-
-                <div className="mt-4 space-y-4 text-xs">
-                  <div>
-                    <div className="flex justify-between mb-1.5 text-slate-700">
-                      <span className="font-semibold">Tracked vs Expected Schedule</span>
-                      <span className="font-bold text-slate-900">{totalActualHours.toFixed(1)}h / {totalAvailableHours}h</span>
-                    </div>
-                    <div className="w-full h-3.5 bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-200">
-                      <div
-                        className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full transition-all duration-700"
-                        style={{ width: `${Math.min(100, trackingCompliancePercent)}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2.5 text-center">
-                    <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/60">
-                      <span className="text-[10px] text-slate-500 font-semibold block">Expected Hours</span>
-                      <span className="text-base font-bold text-slate-800">{totalAvailableHours}h</span>
-                    </div>
-                    <div className="p-2.5 bg-blue-50/70 rounded-xl border border-blue-200/60">
-                      <span className="text-[10px] text-blue-700 font-semibold block">Tracked Hours</span>
-                      <span className="text-base font-bold text-blue-900">{totalActualHours.toFixed(1)}h</span>
-                    </div>
-                    <div className="p-2.5 bg-amber-50/70 rounded-xl border border-amber-200/60">
-                      <span className="text-[10px] text-amber-700 font-semibold block">Untracked Gap</span>
-                      <span className="text-base font-bold text-amber-900">{untrackedHours}h</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Manager Note Callout */}
-              <div className="mt-4 p-3 bg-amber-50/80 rounded-xl border border-amber-200 text-[11px] text-amber-900 flex items-start gap-2">
-                <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <div>
-                  <strong className="font-semibold text-amber-950">Manager Guidance on FTE & Compliance:</strong>
-                  <p className="text-amber-800 mt-0.5 leading-relaxed">
-                    A low FTE percentage can be caused by unrecorded time rather than low productivity. Always review tracking compliance before assessing workload capacity.
-                  </p>
-                </div>
-              </div>
+            <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <span className="text-slate-500">Schedule SLA Benchmark: Target 0 overdue workstreams</span>
+              {overdueTasksCount === 0 ? (
+                <span className="text-emerald-700 bg-emerald-50 px-3 py-1 rounded-lg font-semibold border border-emerald-200">
+                  ✓ SLA Met: 0 Overdue Tasks
+                </span>
+              ) : (
+                <span className="text-rose-700 bg-rose-50 px-3 py-1 rounded-lg font-semibold border border-rose-200">
+                  ⚠️ {overdueTasksCount} overdue tasks flagged across {overdueTasksByDeptData.filter(d => d.overdueCount > 0).length} departments
+                </span>
+              )}
             </div>
           </div>
         </div>
