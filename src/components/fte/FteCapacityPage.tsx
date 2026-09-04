@@ -231,7 +231,6 @@ export const FteCapacityPage: React.FC = () => {
       : 'FTE Capacity & Utilization Report';
 
     const exportData = employeeMetrics.map(m => ({
-      'Employee ID': m.user.employeeId,
       'Name': m.user.name,
       'Job Title': m.user.title,
       'Department': m.departmentName,
@@ -258,7 +257,7 @@ export const FteCapacityPage: React.FC = () => {
             : departments.find(d => d.id === selectedDept)?.name || 'All',
         },
         summaryKpis: {
-          'Target Subject': isTaskUser ? `${currentUser.name} (${currentUser.employeeId})` : `${employeeMetrics.length} Employees`,
+          'Target Subject': isTaskUser ? currentUser.name : `${employeeMetrics.length} Employees`,
           'Total Shift Hours': `${totalShiftHours}h (10h/day shift)`,
           'Total Available Capacity': `${totalAvailable}h (8.5h net/day)`,
           'Total Actual Logged': `${totalActual.toFixed(1)}h`,
@@ -491,7 +490,7 @@ export const FteCapacityPage: React.FC = () => {
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
             <span className="text-xs text-slate-500 font-medium">Total Available Hours</span>
             <div className="text-2xl font-bold text-slate-900 mt-1">{totalAvailable}h</div>
-            <span className="text-[10px] text-slate-400">8h/day net standard</span>
+            <span className="text-[10px] text-slate-400">8.5h/day net standard</span>
           </div>
 
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
@@ -627,7 +626,7 @@ export const FteCapacityPage: React.FC = () => {
                         {item.user.name} {isTaskUser && <span className="text-blue-600 font-normal">(You)</span>}
                       </span>
                       <span className="text-[10px] text-slate-400">
-                        {item.user.employeeId} • {item.user.title}
+                        {item.user.title}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-slate-600">{item.departmentName}</td>

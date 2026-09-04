@@ -62,12 +62,13 @@ export const ViewTaskModal: React.FC<ViewTaskModalProps> = ({
     workingSchedules.find(s => s.id === assignedUser?.workingScheduleId) ||
     workingSchedules[0] || {
       id: 'SCH-001',
-      name: 'Standard 8-Hour (Mon-Fri)',
-      hoursPerDay: 8,
+      name: 'Standard 8.5-Hour (Mon-Fri)',
+      hoursPerDay: 8.5,
+      netWorkHoursPerDay: 8.5,
       workingDays: [1, 2, 3, 4, 5],
       startTime: '08:30',
-      endTime: '17:30',
-      breakHours: 1,
+      endTime: '17:00',
+      breakHours: 0,
     };
 
   const scheduleCalc = calculateAvailableWorkingHours(

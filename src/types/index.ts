@@ -66,7 +66,7 @@ export interface Task {
   departmentId: string;
   startDate: string; // YYYY-MM-DD
   endDate?: string;  // YYYY-MM-DD (Optional)
-  shiftHours: number; // Shift Hour (e.g. 8h/10h scheduled effort)
+  shiftHours: number; // Shift Hour (e.g. 8.5h/10h scheduled effort)
   plannedHours?: number; // alias for backward compatibility
   actualHours: number; // calculated sum of time sessions
   variance: number;    // actualHours - shiftHours

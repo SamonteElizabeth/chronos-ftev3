@@ -237,7 +237,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({
     return { items: days, total: days.reduce((sum, d) => sum + d.hours, 0) };
   }, [period, selectedDate, userSessions]);
 
-  const maxChartHour = Math.max(8, ...chartBreakdown.items.map(d => d.hours));
+  const maxChartHour = Math.max(8.5, ...chartBreakdown.items.map(d => d.hours));
 
   // Status Distribution counts
   const statusCounts = useMemo(() => {
@@ -278,7 +278,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({
   const handleExportExcel = () => {
     const userDept = departments.find(d => d.id === currentUser.departmentId);
     const metadata: ExportMetadata = {
-      reportName: 'Personal Desk & Time Tracking Dashboard Export',
+      reportName: 'Personal Desk & Time Tracking Analytics Export',
       generatedDate: new Date().toLocaleString(),
       generatedBy: `${currentUser.name} (${currentUser.role})`,
       filtersApplied: {
@@ -340,10 +340,10 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({
         { sheetName: 'My Assigned Tasks', data: taskData },
         { sheetName: 'Logged Time Sessions', data: sessionsData },
       ],
-      `${currentUser.name.replace(/\s+/g, '_')}_Personal_Dashboard_Export`
+      `${currentUser.name.replace(/\s+/g, '_')}_Personal_Analytics_Export`
     );
 
-    showToast('success', 'Excel Export Ready', 'Personal dashboard data downloaded successfully.');
+    showToast('success', 'Excel Export Ready', 'Personal analytics data downloaded successfully.');
   };
 
   return (
@@ -356,7 +356,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({
         <button
           onClick={handleExportExcel}
           className="px-3.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200 shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto active:scale-95"
-          title="Export personal dashboard tasks and logged time to Excel"
+          title="Export personal analytics tasks and logged time to Excel"
         >
           <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
           <span>Export Excel</span>

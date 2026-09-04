@@ -380,7 +380,7 @@ export const EmployeeFteDetailsModal: React.FC<EmployeeFteDetailsModalProps> = (
         generatedDate: new Date().toLocaleString(),
         generatedBy: `System Administrator`,
         filtersApplied: {
-          Employee: `${user.name} (${user.employeeId})`,
+          Employee: user.name,
           Department: departmentName,
           Period: `${periodLabel} (${dateRange.startDate} to ${dateRange.endDate})`,
           'FTE Utilization': `${fte}% (${status})`,
@@ -416,9 +416,6 @@ export const EmployeeFteDetailsModal: React.FC<EmployeeFteDetailsModalProps> = (
             <div>
               <div className="flex items-center gap-2.5 flex-wrap">
                 <h2 className="text-xl font-bold text-slate-900">{user.name}</h2>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                  {user.employeeId}
-                </span>
                 <span
                   className={`px-2.5 py-0.5 rounded-full text-xs font-bold inline-flex items-center gap-1.5 ${
                     isOverCapacity(status)

@@ -115,7 +115,7 @@ interface WeeklyBarProps {
   targetHours?: number;
 }
 
-export const WeeklyHoursChart: React.FC<WeeklyBarProps> = ({ data, targetHours = 8 }) => {
+export const WeeklyHoursChart: React.FC<WeeklyBarProps> = ({ data, targetHours = 8.5 }) => {
   return (
     <div className="h-56 w-full">
       <ResponsiveContainer width="100%" height="100%">

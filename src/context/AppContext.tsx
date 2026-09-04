@@ -221,7 +221,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return dept;
     });
   });
-  const [tasks, setTasks] = useState<Task[]>(() => loadStorage(STORAGE_KEYS.TASKS, initialTasks));
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    const loaded = loadStorage(STORAGE_KEYS.TASKS, initialTasks);
+    return loaded.map((t: Task) => {
+      if (t.shiftHours === 8 || t.plannedHours === 8) {
+        const shiftHours = 8.5;
+        const plannedHours = 8.5;
+        const { variance, variancePercent } = calculateVariance(shiftHours, t.actualHours || 0);
+        return {
+          ...t,
+          shiftHours,
+          plannedHours,
+          variance,
+          variancePercent,
+        };
+      }
+      return t;
+    });
+  });
   const [timeSessions, setTimeSessions] = useState<TimeSession[]>(() => loadStorage(STORAGE_KEYS.TIME_SESSIONS, initialTimeSessions));
   const [workingSchedules, setWorkingSchedules] = useState<WorkingSchedule[]>(() => {
     const loaded = loadStorage(STORAGE_KEYS.SCHEDULES, initialWorkingSchedules);
@@ -593,7 +610,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return null;
     }
     // 5. Shift Effort > 0
-    const effShiftHours = taskData.shiftHours || taskData.plannedHours || 8;
+    const effShiftHours = taskData.shiftHours !== undefined ? Number(taskData.shiftHours) : (taskData.plannedHours !== undefined ? Number(taskData.plannedHours) : 8.5);
     if (effShiftHours <= 0) {
       showToast('error', 'Validation Error', 'Shift Hours must be greater than zero hours.');
       return null;
@@ -660,7 +677,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const now = new Date().toISOString();
-    const shiftHoursVal = inputShiftHours !== undefined ? inputShiftHours : (existing.shiftHours || existing.plannedHours || 8);
+    const shiftHoursVal = inputShiftHours !== undefined ? Number(inputShiftHours) : (existing.shiftHours || existing.plannedHours || 8.5);
     const actual = existing.actualHours;
     const { variance, variancePercent } = calculateVariance(shiftHoursVal, actual);
 

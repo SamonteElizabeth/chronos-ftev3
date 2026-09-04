@@ -6,6 +6,7 @@ import {
   Calendar,
   AlertCircle,
   FileText,
+  Clock,
 } from 'lucide-react';
 
 interface TaskModalProps {
@@ -37,7 +38,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [taskType, setTaskType] = useState('Analysis');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [shiftHours, setShiftHours] = useState<number>(8);
+  const [shiftHours, setShiftHours] = useState<number>(8.5);
   const [remarks, setRemarks] = useState('');
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -51,7 +52,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setTaskType(activeTaskToEdit.taskType || 'Analysis');
       setStartDate(activeTaskToEdit.startDate);
       setEndDate(activeTaskToEdit.endDate || '');
-      setShiftHours(activeTaskToEdit.shiftHours || activeTaskToEdit.plannedHours || 8);
+      setShiftHours(activeTaskToEdit.shiftHours || activeTaskToEdit.plannedHours || 8.5);
       setRemarks(activeTaskToEdit.remarks || '');
       setErrors({});
     } else {
@@ -63,7 +64,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setTaskType(categoryConfig.taskTypes[0] || 'Analysis');
       setStartDate(today);
       setEndDate('');
-      setShiftHours(8);
+      setShiftHours(8.5);
       setRemarks('');
       setErrors({});
     }
@@ -106,8 +107,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           taskType,
           startDate,
           endDate: cleanEndDate,
-          shiftHours: Number(shiftHours || 8),
-          plannedHours: Number(shiftHours || 8),
+          shiftHours: Number(shiftHours || 8.5),
+          plannedHours: Number(shiftHours || 8.5),
           remarks: trimmedRemarks,
         }
       );
@@ -125,8 +126,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
         departmentId: departmentId || currentUser.departmentId || 'DEP-001',
         startDate,
         endDate: cleanEndDate,
-        shiftHours: Number(shiftHours || 8),
-        plannedHours: Number(shiftHours || 8),
+        shiftHours: Number(shiftHours || 8.5),
+        plannedHours: Number(shiftHours || 8.5),
         createdBy: currentUser.id,
       });
       if (created) onClose();
@@ -253,6 +254,24 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                 </p>
               )}
             </div>
+          </div>
+
+          {/* Shift Hour (Defaults to 8.5) */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-800 mb-1.5 flex items-center justify-between">
+              <span className="flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-slate-400" /> Shift Hour (h) <span className="text-rose-500">*</span>
+              </span>
+              <span className="text-[11px] font-normal text-slate-400">Default: 8.5h shift target</span>
+            </label>
+            <input
+              type="number"
+              step="0.5"
+              min="0.5"
+              value={shiftHours}
+              onChange={e => setShiftHours(Number(e.target.value))}
+              className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-white font-mono"
+            />
           </div>
 
           {/* Remarks (Optional) */}

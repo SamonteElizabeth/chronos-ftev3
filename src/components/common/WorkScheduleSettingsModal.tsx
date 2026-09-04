@@ -94,7 +94,7 @@ export const WorkScheduleSettingsModal: React.FC<WorkScheduleSettingsModalProps>
       workingSchedules.find(s => s.id === user.workingScheduleId) ||
       workingSchedules[0] || {
         id: 'SCH-001',
-        name: 'Standard 8-Hour (Mon-Fri)',
+        name: 'Standard 8.5-Hour (Mon-Fri)',
         hoursPerDay: 10,
         workingDays: [1, 2, 3, 4, 5],
         startTime: '08:30',

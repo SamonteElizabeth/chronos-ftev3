@@ -72,33 +72,33 @@ export const Sidebar = ({
   const navItems: NavItem[] = [
     {
       id: 'dashboard',
-      label: 'Dashboard',
+      label: 'Analytics',
       icon: <LayoutDashboard className="w-4 h-4" />,
-      allowedRoles: ['ADMIN', 'MANAGER', 'DEPT_MANAGER', 'TASK_USER'],
+      allowedRoles: ['MANAGER', 'DEPT_MANAGER', 'TASK_USER'],
     },
     {
       id: 'tasks',
       label: 'Task Management',
       icon: <CheckSquare className="w-4 h-4" />,
-      allowedRoles: ['ADMIN', 'MANAGER', 'DEPT_MANAGER', 'TASK_USER'],
+      allowedRoles: ['MANAGER', 'DEPT_MANAGER', 'TASK_USER'],
     },
     {
       id: 'timetracking',
       label: 'Task Execution',
       icon: <Clock className="w-4 h-4" />,
-      allowedRoles: ['ADMIN', 'MANAGER', 'DEPT_MANAGER', 'TASK_USER'],
+      allowedRoles: ['MANAGER', 'DEPT_MANAGER', 'TASK_USER'],
     },
     {
       id: 'timecorrection',
       label: 'Time Correction',
       icon: <ClockAlert className="w-4 h-4" />,
-      allowedRoles: ['ADMIN', 'MANAGER', 'DEPT_MANAGER', 'TASK_USER'],
+      allowedRoles: ['MANAGER', 'DEPT_MANAGER', 'TASK_USER'],
     },
     {
       id: 'fte',
       label: 'FTE & Utilization',
       icon: <PieChart className="w-4 h-4" />,
-      allowedRoles: ['ADMIN', 'MANAGER', 'DEPT_MANAGER'],
+      allowedRoles: ['MANAGER', 'DEPT_MANAGER'],
     },
     {
       id: 'users',
@@ -254,7 +254,7 @@ export const Sidebar = ({
         </nav>
 
         {/* Active Timer Sidebar Card */}
-        {activeTimer && activeTimerTask && (
+        {role !== 'ADMIN' && activeTimer && activeTimerTask && (
           <div className="p-3.5 mx-4 mb-3 bg-slate-900/90 border border-blue-500/30 rounded-xl shadow-sm">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[10px] uppercase font-bold text-blue-400 flex items-center gap-1.5">

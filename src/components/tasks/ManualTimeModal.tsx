@@ -150,7 +150,7 @@ export const ManualTimeModal: React.FC<ManualTimeModalProps> = ({
                 .filter(u => u.status === 'Active')
                 .map(u => (
                   <option key={u.id} value={u.id}>
-                    {u.name} ({u.employeeId})
+                    {u.name}
                   </option>
                 ))}
             </select>

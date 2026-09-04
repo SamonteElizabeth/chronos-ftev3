@@ -499,7 +499,7 @@ export const TimeCorrectionModal: React.FC<TimeCorrectionModalProps> = ({
                   .filter(u => u.status === 'Active')
                   .map(u => (
                     <option key={u.id} value={u.id}>
-                      {u.name} ({u.employeeId}) - {u.role}
+                      {u.name} - {u.role}
                     </option>
                   ))}
               </select>

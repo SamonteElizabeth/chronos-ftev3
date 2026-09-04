@@ -23,13 +23,24 @@ import { LayoutDashboard, Users, Menu } from 'lucide-react';
 const MainLayout: React.FC = () => {
   const { currentUser, isAuthenticated } = useApp();
 
-  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [activeTab, setActiveTab] = useState<TabType>(() =>
+    currentUser.role === 'ADMIN' ? 'users' : 'dashboard'
+  );
   const [maintenanceSubTab, setMaintenanceSubTab] = useState<MaintenanceSubTab>('task-names');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  // If currentUser is a TASK_USER and activeTab is 'fte', reset to dashboard
+  // Role-based tab guards
   useEffect(() => {
-    if (currentUser.role === 'TASK_USER' && activeTab === 'fte') {
+    if (
+      currentUser.role === 'ADMIN' &&
+      (activeTab === 'dashboard' ||
+        activeTab === 'tasks' ||
+        activeTab === 'timetracking' ||
+        activeTab === 'timecorrection' ||
+        activeTab === 'fte')
+    ) {
+      setActiveTab('users');
+    } else if (currentUser.role === 'TASK_USER' && activeTab === 'fte') {
       setActiveTab('dashboard');
     }
   }, [currentUser.role, activeTab]);
@@ -63,6 +74,17 @@ const MainLayout: React.FC = () => {
   };
 
   const handleSetActiveTab = (tab: TabType, subTab?: MaintenanceSubTab) => {
+    if (
+      currentUser.role === 'ADMIN' &&
+      (tab === 'dashboard' ||
+        tab === 'tasks' ||
+        tab === 'timetracking' ||
+        tab === 'timecorrection' ||
+        tab === 'fte')
+    ) {
+      setActiveTab('users');
+      return;
+    }
     if (currentUser.role === 'TASK_USER' && tab === 'fte') {
       setActiveTab('dashboard');
       return;
@@ -84,7 +106,7 @@ const MainLayout: React.FC = () => {
   }
 
   const tabTitles: Record<string, string> = {
-    dashboard: 'Dashboard',
+    dashboard: 'Analytics',
     tasks: 'Task Management',
     timetracking: 'Task Execution',
     timecorrection: 'Time Correction',
@@ -152,13 +174,13 @@ const MainLayout: React.FC = () => {
         {/* Dynamic Page Content (Full Screen) */}
         <main className="p-4 sm:p-6 lg:p-8 flex-1 w-full space-y-6">
           {/* Dashboard Tab */}
-          {activeTab === 'dashboard' && (
+          {activeTab === 'dashboard' && currentUser.role !== 'ADMIN' && (
             <div className="space-y-6">
-              {/* If Manager, Dept Manager, or Admin, offer view toggle between Employee View and Manager View */}
+              {/* If Manager or Dept Manager, offer view toggle between Employee View and Manager View */}
               {currentUser.role !== 'TASK_USER' && (
                 <div className="flex items-center justify-between bg-white px-4 py-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
                   <div className="text-xs text-slate-500 font-medium">
-                    Dashboard Perspective:
+                    Analytics Perspective:
                   </div>
                   <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs">
                     <button
@@ -197,7 +219,7 @@ const MainLayout: React.FC = () => {
           )}
 
           {/* Tasks Tab */}
-          {activeTab === 'tasks' && (
+          {activeTab === 'tasks' && currentUser.role !== 'ADMIN' && (
             <TaskManagementPage
               onOpenNewTask={handleOpenNewTask}
               onViewTask={handleOpenViewTask}
@@ -206,7 +228,7 @@ const MainLayout: React.FC = () => {
           )}
 
           {/* Time Tracking / Task Execution Tab */}
-          {activeTab === 'timetracking' && (
+          {activeTab === 'timetracking' && currentUser.role !== 'ADMIN' && (
             <TimeTrackingPage
               onEditTask={handleOpenEditTask}
               onViewTask={handleOpenViewTask}
@@ -214,14 +236,14 @@ const MainLayout: React.FC = () => {
           )}
 
           {/* Time Correction Module */}
-          {activeTab === 'timecorrection' && (
+          {activeTab === 'timecorrection' && currentUser.role !== 'ADMIN' && (
             <TimeCorrectionPage
               onViewTask={handleOpenViewTask}
             />
           )}
 
-          {/* FTE & Capacity Tab (Admin & Managers only) */}
-          {activeTab === 'fte' && currentUser.role !== 'TASK_USER' && <FteCapacityPage />}
+          {/* FTE & Capacity Tab (Managers only) */}
+          {activeTab === 'fte' && currentUser.role !== 'TASK_USER' && currentUser.role !== 'ADMIN' && <FteCapacityPage />}
 
           {/* User Management Tab (Admin) */}
           {activeTab === 'users' && <UserManagementPage />}

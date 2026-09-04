@@ -566,8 +566,8 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
 
     const metadata: ExportMetadata = {
       reportName: isDeptManager
-        ? `${activeDeptName} Department Executive Dashboard Export`
-        : 'Executive Dashboard Export',
+        ? `${activeDeptName} Department Executive Analytics Export`
+        : 'Executive Analytics Export',
       generatedDate: new Date().toLocaleString(),
       generatedBy: `${currentUser.name} (${currentUser.role})`,
       filtersApplied: {
@@ -624,7 +624,6 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
 
     // 2. Staff Capacity & FTE Dataset
     const capacityData = employeeUtilizationData.map(e => ({
-      'Employee ID': e.id,
       'Employee Name': e.name,
       'Title': e.title,
       'Department': e.department,
@@ -657,10 +656,10 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
         { sheetName: 'Staff Capacity & FTE', data: capacityData },
         { sheetName: 'Department Breakdown', data: departmentData },
       ],
-      isDeptManager ? `${activeDeptName.replace(/\s+/g, '_')}_Dashboard_Export` : 'Workforce_Dashboard_Export'
+      isDeptManager ? `${activeDeptName.replace(/\s+/g, '_')}_Analytics_Export` : 'Workforce_Analytics_Export'
     );
 
-    showToast('success', 'Excel Export Ready', 'Dashboard workbook has been downloaded successfully.');
+    showToast('success', 'Excel Export Ready', 'Analytics workbook has been downloaded successfully.');
   };
 
   return (
@@ -671,10 +670,10 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-bold text-slate-900 tracking-tight">
               {isAdmin
-                ? 'Admin Executive Dashboard'
+                ? 'Admin Executive Analytics'
                 : isDeptManager
-                ? `${currentDept?.name || 'Department'} Manager Dashboard`
-                : 'Manager Dashboard'}
+                ? `${currentDept?.name || 'Department'} Manager Analytics`
+                : 'Manager Analytics'}
             </h2>
             <span
               className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${
@@ -736,7 +735,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onViewTask }
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-blue-600" />
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Dashboard Filters
+              Analytics Filters
             </h3>
             {activeFiltersCount > 0 && (
               <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold">

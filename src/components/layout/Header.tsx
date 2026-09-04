@@ -31,7 +31,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNewTask,
   onOpenManualTime,
   onOpenWorkSchedule,
-  activeTabTitle = 'Dashboard',
+  activeTabTitle = 'Analytics',
 }) => {
   const {
     currentUser,
